@@ -1,5 +1,4 @@
 ﻿using System.Text;
-using CSScriptingLang.VM;
 
 namespace CSScriptingLang.Utils.CodeWriter;
 

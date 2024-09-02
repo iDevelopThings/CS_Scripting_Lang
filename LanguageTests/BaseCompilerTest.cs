@@ -87,6 +87,7 @@ public class BaseCompilerTest
             return ExecuteModules(source, printParseTree, moduleName, setup);
         }
         catch (Exception e) {
+            Console.WriteLine(e);
             throw;
         }
     }

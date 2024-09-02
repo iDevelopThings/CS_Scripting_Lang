@@ -17,7 +17,6 @@ public class InterpreterSourceGeneratorTests
             "CSScriptingLang",
             Directory.GetFiles("../../../../../CSScriptingLang/Parsing/AST/", "*.cs")
                .Concat(Directory.GetFiles("../../../../../CSScriptingLang/Interpreter/", "*.cs"))
-               .Concat(Directory.GetFiles("../../../../../CSScriptingLang/VM/", "*.cs"))
                .Select(f => CSharpSyntaxTree.ParseText(File.ReadAllText(f))),
             []
         );

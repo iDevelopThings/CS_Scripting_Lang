@@ -1,5 +1,5 @@
 ﻿using CSScriptingLang.Lexing;
-using CSScriptingLang.VM.Tables;
+using CSScriptingLang.RuntimeValues.Types;
 
 namespace CSScriptingLang.Parsing.AST;
 

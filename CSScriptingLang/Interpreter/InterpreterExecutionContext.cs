@@ -1,7 +1,6 @@
 ﻿using CSScriptingLang.Interpreter.Modules;
 using CSScriptingLang.Utils;
-using CSScriptingLang.VM;
-using CSScriptingLang.VM.Tables;
+using CSScriptingLang.RuntimeValues.Types;
 using Engine.Engine.Logging;
 
 namespace CSScriptingLang.Interpreter;

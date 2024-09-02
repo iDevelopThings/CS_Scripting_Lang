@@ -1,5 +1,4 @@
 ﻿using CSScriptingLang.RuntimeValues;
-using CSScriptingLang.VM;
 
 namespace LanguageTests.InterpreterTests;
 

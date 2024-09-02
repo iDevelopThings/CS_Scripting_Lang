@@ -57,11 +57,15 @@ public class ModuleRegistry
     public Module LoadModule(string name) {
         List<IVirtualFile> scripts = new();
 
+        if (name.EndsWith(Script.Extension)) {
+            name = name[..^Script.Extension.Length];
+        }
+
         if (FileSystem.DirectoryExists(name)) {
             var dir = FileSystem.GetDirectory(name);
-            scripts = dir.Files(true).Where(f => f.Ext == ".js").ToList();
-        } else if (FileSystem.FileExists($"{name}.js")) {
-            scripts.Add(FileSystem.GetFile($"{name}.js"));
+            scripts = dir.Files(true).Where(f => f.Ext == Script.Extension).ToList();
+        } else if (FileSystem.FileExists($"{name}{Script.Extension}")) {
+            scripts.Add(FileSystem.GetFile($"{name}{Script.Extension}"));
         }
 
         if (scripts.Count == 0) {

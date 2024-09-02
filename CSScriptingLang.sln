@@ -6,8 +6,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CSScriptingLangGenerators",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CSScriptingLangGenerators.Tests", "CSScriptingLangGenerators\CSScriptingLangGenerators.Tests\CSScriptingLangGenerators.Tests.csproj", "{1D00231A-9CBC-4CBC-92D7-BFF38F82CCF5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CSScriptingLangTests", "CSScriptingLangTests\CSScriptingLangTests.csproj", "{AB96F57D-3CE2-4937-9C60-B7A068D8FE25}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LanguageTests", "LanguageTests\LanguageTests.csproj", "{EF6D755B-7704-4117-A584-92D7814F75D7}"
 EndProject
 Global
@@ -28,10 +26,6 @@ Global
 		{1D00231A-9CBC-4CBC-92D7-BFF38F82CCF5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1D00231A-9CBC-4CBC-92D7-BFF38F82CCF5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1D00231A-9CBC-4CBC-92D7-BFF38F82CCF5}.Release|Any CPU.Build.0 = Release|Any CPU
-		{AB96F57D-3CE2-4937-9C60-B7A068D8FE25}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{AB96F57D-3CE2-4937-9C60-B7A068D8FE25}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{AB96F57D-3CE2-4937-9C60-B7A068D8FE25}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{AB96F57D-3CE2-4937-9C60-B7A068D8FE25}.Release|Any CPU.Build.0 = Release|Any CPU
 		{EF6D755B-7704-4117-A584-92D7814F75D7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{EF6D755B-7704-4117-A584-92D7814F75D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EF6D755B-7704-4117-A584-92D7814F75D7}.Release|Any CPU.ActiveCfg = Release|Any CPU

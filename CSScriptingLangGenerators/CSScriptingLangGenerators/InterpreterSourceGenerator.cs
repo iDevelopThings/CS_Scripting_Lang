@@ -14,6 +14,8 @@ namespace CSScriptingLangGenerators;
 public class InterpreterSourceGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context) {
+        return;
+        
         var provider = context.SyntaxProvider.CreateSyntaxProvider(
             (s,   _) => IsCandidateClass(s),
             (ctx, _) => GetClassDeclarationForSourceGen(ctx)
@@ -110,11 +112,25 @@ public class InterpreterSourceGenerator : IIncrementalGenerator
            .Where(d => genericTypes.All(g => g.Declaration.Identifier.Text != d.ClassName))
            .ToList();
 
-        var execMethods = interpreterSymbols
+        Dictionary<string, IMethodSymbol> execMethods = new();
+        foreach (var symb in interpreterSymbols) {
+            var members = symb.GetMembers("Execute");
+            foreach (var member in members) {
+                if (member is not IMethodSymbol method)
+                    continue;
+
+                if (method.Parameters.Length != 1)
+                    continue;
+                var param = method.Parameters[0];
+                execMethods[param.Type!.Name] = method;
+            }
+        }
+
+        /*var execMethods = interpreterSymbols
            .SelectMany(i => i.GetMembers("Execute"))
            .OfType<IMethodSymbol>()
-           .Where(m => m.Parameters.Length == 1)
-           .ToDictionary(m => m.Parameters[0].Type.Name);
+           .Where(m => m.Parameters != null && m.Parameters.Length == 1 && m.Parameters[0].Type != null)
+           .ToDictionary(m => m.Parameters[0].Type!.Name, m => m);*/
 
         var allClassNames = declarationsInfo.Select(d => d.ClassName).ToList();
         allClassNames.AddRange(genericTypes.Select(g => g.ClassName));
@@ -135,7 +151,7 @@ public class InterpreterSourceGenerator : IIncrementalGenerator
         }}
         */
 
-        
+
         var defaultMethodsImpl = string.Join(
             "\n",
             undefinedMethods.Select(m => $@"

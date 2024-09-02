@@ -1,5 +1,5 @@
-﻿using CSScriptingLang.Utils.CodeWriter;
-using CSScriptingLang.VM.Tables;
+﻿using CSScriptingLang.RuntimeValues.Types;
+using CSScriptingLang.Utils.CodeWriter;
 
 namespace CSScriptingLang.RuntimeValues;
 

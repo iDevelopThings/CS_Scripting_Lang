@@ -3,7 +3,7 @@ using CSScriptingLang.Interpreter.Modules;
 using CSScriptingLang.Parsing.AST;
 using CSScriptingLang.RuntimeValues;
 using CSScriptingLang.Utils;
-using CSScriptingLang.VM.Tables;
+using CSScriptingLang.RuntimeValues.Types;
 using Engine.Engine.Logging;
 
 namespace CSScriptingLang.Interpreter;

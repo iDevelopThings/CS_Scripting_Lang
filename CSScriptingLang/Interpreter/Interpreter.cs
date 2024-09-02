@@ -2,13 +2,10 @@
 using CSScriptingLang.Interpreter.Bindings;
 using CSScriptingLang.Interpreter.Modules;
 using CSScriptingLang.Lexing;
-using CSScriptingLang.Parsing;
 using CSScriptingLang.Parsing.AST;
 using CSScriptingLang.RuntimeValues;
 using CSScriptingLang.Utils;
-using CSScriptingLang.VM;
-using CSScriptingLang.VM.Instructions;
-using CSScriptingLang.VM.Tables;
+using CSScriptingLang.RuntimeValues.Types;
 
 namespace CSScriptingLang.Interpreter;
 
@@ -525,6 +522,7 @@ public partial class Interpreter
             if (property != null) {
                 PushValue(property);
                 result.ValuesPushed++;
+                return result;
             }
         }
 

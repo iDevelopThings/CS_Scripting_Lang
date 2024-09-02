@@ -38,7 +38,7 @@
 &lt;/AssemblyExplorer&gt;</s:String>
 	<s:Boolean x:Key="/Default/Environment/Hierarchy/Build/BuildTool/AutoDownloadSdk/@EntryValue">False</s:Boolean>
 	<s:String x:Key="/Default/Environment/Hierarchy/Build/SolBuilderDuo/UseMsbuildSolutionBuilder/@EntryValue">No</s:String>
-	<s:Int64 x:Key="/Default/Environment/IndexEventsCount/SymbolEventsNotPersistedCount/@EntryValue">-3176</s:Int64>
+	<s:Int64 x:Key="/Default/Environment/IndexEventsCount/SymbolEventsNotPersistedCount/@EntryValue">-2987</s:Int64>
 	
 	
 	
@@ -58,39 +58,14 @@
 	<s:Boolean x:Key="/Default/Environment/UnitTesting/CreateUnitTestDialog/ShowAdvancedOptions/@EntryValue">True</s:Boolean>
 	<s:String x:Key="/Default/Environment/UnitTesting/CreateUnitTestDialog/TestProjectMapping/=0867DBEF_002D42FE_002D4881_002DBBE0_002DDC547A9CE97A/@EntryIndexedValue">EF6D755B-7704-4117-A584-92D7814F75D7</s:String>
 	<s:String x:Key="/Default/Environment/UnitTesting/CreateUnitTestDialog/TestTemplateMapping/=NUnit3x/@EntryIndexedValue">db4927dd-2e12-48a7-9a84-2b7e3e31b9c8</s:String>
-	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=2390eb45_002D7f37_002D47a5_002D9542_002Dd6154acaf353/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="Session #3" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
-  &lt;And&gt;&#xD;
-    &lt;Namespace&gt;LanguageTests.InterpreterTests&lt;/Namespace&gt;&#xD;
-    &lt;Project Location="F:\c#\CSScriptingLang\LanguageTests" Presentation="&amp;lt;LanguageTests&amp;gt;" /&gt;&#xD;
-    &lt;TestAncestor&gt;&#xD;
-      &lt;TestId&gt;NUnit3x::EF6D755B-7704-4117-A584-92D7814F75D7::net8.0::LanguageTests.InterpreterTests.LoopsTest&lt;/TestId&gt;&#xD;
-    &lt;/TestAncestor&gt;&#xD;
-  &lt;/And&gt;&#xD;
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=cccad837_002D2072_002D4796_002Da45d_002Db945d2e37e1d/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="InterpreterSourceGeneratorTests" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;TestAncestor&gt;&#xD;
+    &lt;TestId&gt;NUnit3x::1D00231A-9CBC-4CBC-92D7-BFF38F82CCF5::net8.0::CSScriptingLangGenerators.Tests.InterpreterSourceGeneratorTests&lt;/TestId&gt;&#xD;
+  &lt;/TestAncestor&gt;&#xD;
 &lt;/SessionState&gt;</s:String>
-	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=705689a2_002D1168_002D459d_002Db238_002D2c2f78059ac7/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="Session #2" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
-  &lt;And&gt;&#xD;
-    &lt;Namespace&gt;LanguageTests.InterpreterTests&lt;/Namespace&gt;&#xD;
-    &lt;Project Location="F:\c#\CSScriptingLang\LanguageTests" Presentation="&amp;lt;LanguageTests&amp;gt;" /&gt;&#xD;
-    &lt;TestAncestor&gt;&#xD;
-      &lt;TestId&gt;NUnit3x::EF6D755B-7704-4117-A584-92D7814F75D7::net8.0::LanguageTests.InterpreterTests.LoopsTest&lt;/TestId&gt;&#xD;
-    &lt;/TestAncestor&gt;&#xD;
-    &lt;TestAncestor&gt;&#xD;
-      &lt;TestId&gt;NUnit3x::EF6D755B-7704-4117-A584-92D7814F75D7::net8.0::LanguageTests.InterpreterTests.LoopsTest.ForRange&lt;/TestId&gt;&#xD;
-    &lt;/TestAncestor&gt;&#xD;
-  &lt;/And&gt;&#xD;
-&lt;/SessionState&gt;</s:String>
-	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=e2101b73_002D4578_002D4508_002Da304_002D1f4b7bbcc60a/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="Session" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
-  &lt;And&gt;&#xD;
-    &lt;Namespace&gt;LanguageTests.InterpreterTests&lt;/Namespace&gt;&#xD;
-    &lt;Project Location="F:\c#\CSScriptingLang\LanguageTests" Presentation="&amp;lt;LanguageTests&amp;gt;" /&gt;&#xD;
-    &lt;TestAncestor&gt;&#xD;
-      &lt;TestId&gt;NUnit3x::EF6D755B-7704-4117-A584-92D7814F75D7::net8.0::LanguageTests.InterpreterTests.LoopsTest&lt;/TestId&gt;&#xD;
-    &lt;/TestAncestor&gt;&#xD;
-    &lt;TestAncestor&gt;&#xD;
-      &lt;TestId&gt;NUnit3x::EF6D755B-7704-4117-A584-92D7814F75D7::net8.0::LanguageTests.InterpreterTests.LoopsTest.ForRange&lt;/TestId&gt;&#xD;
-    &lt;/TestAncestor&gt;&#xD;
-  &lt;/And&gt;&#xD;
-&lt;/SessionState&gt;</s:String>
+	
+	
+	
 	
 	
 	

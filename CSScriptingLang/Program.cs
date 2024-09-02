@@ -1,58 +1,25 @@
-﻿using CSScriptingLang;
+﻿using CSScriptingLang.Core.FileSystem;
 using CSScriptingLang.Interpreter;
-using CSScriptingLang.Lexing;
-using CSScriptingLang.Parsing;
-using CSScriptingLang.Parsing.AST;
-using CSScriptingLang.VM;
-using SymbolTable = CSScriptingLang.VM.Tables.SymbolTable;
 
 
 class Program
 {
-    public static Lexer            lexer;
-    public static Parser           parser;
-    public static ByteCodeCompiler compiler;
-    public static VirtualMachine   vm;
-    public static Interpreter      interpreter;
+    public static FileSystem  FileSystem  { get; set; }
+    public static Interpreter Interpreter { get; set; }
 
-    [STAThread]
     public static void Main(string[] args) {
+        FileSystem = new FileSystem(Path.Join(Directory.GetCurrentDirectory(), "CSScriptingLang", "TestingScripts"), true);
+        Interpreter = new Interpreter(FileSystem);
 
-        SymbolTable.Init();
-
-        // var visitor = new ASTPrintingVisitor();
-        // visitor.VisitProgramNode(parser.Program);
-        // vm = new VirtualMachine();
-
-        var unit = CompilationUnit.FromDirectory("./CSScriptingLang/TestingScripts");
-        var main = unit.GetMainScript();
-
-
-        lexer  = new Lexer(main.Source);
-        parser = new Parser(lexer);
-
-        interpreter = new Interpreter();
-        interpreter.Load(parser.Program);
-        interpreter.Execute();
-
-        Console.WriteLine(new string('-', 20));
-
-        /*
-        compiler = new ByteCodeCompiler(parser.Program, lexer.ErrorWriter);
-
-        vm.Load(compiler.Instructions);
-
-        // Console.WriteLine(parser.Program.ToString(0));
-        // Console.WriteLine(new string('-', 20));
-        // compiler.Dump();
-        // Console.WriteLine(compiler.ToString());
-        // Console.WriteLine(new string('-', 20));
-
-        vm.ExecuteSafe();
-        */
-
+        var mainModule = Interpreter.ModuleRegistry.LoadModule(args[0] ?? "main");
+        
+        try {
+            Interpreter.Execute(mainModule);
+        }
+        catch (Exception e) {
+            Console.WriteLine(e.Message);
+        }
     }
-   
 }
 
 

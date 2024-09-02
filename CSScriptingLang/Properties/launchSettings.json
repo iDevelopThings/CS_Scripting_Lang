@@ -2,7 +2,8 @@
   "profiles": {
     "Run(Debug)": {
       "commandName": "Project",
-      "workingDirectory": "$(SolutionDir)\\"
+      "workingDirectory": "$(SolutionDir)\\",
+      "commandLineArgs": "testing.js"
     }
   }
 }

@@ -1,13 +1,4 @@
-﻿using CSScriptingLang.Core.FileSystem;
-using CSScriptingLang.Interpreter.Modules;
-using CSScriptingLang.Parsing.AST;
-using CSScriptingLang.RuntimeValues;
-using CSScriptingLang.Utils;
-using CSScriptingLang.VM;
-using CSScriptingLang.VM.Tables;
-using Engine.Engine.Logging;
-
-namespace CSScriptingLang.Interpreter;
+﻿namespace CSScriptingLang.Interpreter;
 
 public static class InterpreterEvents
 {

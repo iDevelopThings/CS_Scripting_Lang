@@ -1,5 +1,5 @@
 ﻿using CSScriptingLang.RuntimeValues;
-using CSScriptingLang.VM.Tables;
+using CSScriptingLang.RuntimeValues.Types;
 using NUnit.Framework.Constraints;
 
 namespace LanguageTests;

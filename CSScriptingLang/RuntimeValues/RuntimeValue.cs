@@ -1,9 +1,9 @@
 ﻿using System.Globalization;
 using CSScriptingLang.Interpreter;
 using CSScriptingLang.Lexing;
+using CSScriptingLang.RuntimeValues.Types;
 using CSScriptingLang.Utils;
 using CSScriptingLang.Utils.CodeWriter;
-using CSScriptingLang.VM.Tables;
 using Engine.Engine.Logging;
 
 namespace CSScriptingLang.RuntimeValues;
