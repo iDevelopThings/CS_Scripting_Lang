@@ -38,7 +38,7 @@
 &lt;/AssemblyExplorer&gt;</s:String>
 	<s:Boolean x:Key="/Default/Environment/Hierarchy/Build/BuildTool/AutoDownloadSdk/@EntryValue">False</s:Boolean>
 	<s:String x:Key="/Default/Environment/Hierarchy/Build/SolBuilderDuo/UseMsbuildSolutionBuilder/@EntryValue">No</s:String>
-	<s:Int64 x:Key="/Default/Environment/IndexEventsCount/SymbolEventsNotPersistedCount/@EntryValue">-3177</s:Int64>
+	<s:Int64 x:Key="/Default/Environment/IndexEventsCount/SymbolEventsNotPersistedCount/@EntryValue">-3176</s:Int64>
 	
 	
 	
