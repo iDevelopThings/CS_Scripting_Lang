@@ -1,0 +1,8 @@
+﻿{
+  "profiles": {
+    "Run(Debug)": {
+      "commandName": "Project",
+      "workingDirectory": "$(SolutionDir)\\"
+    }
+  }
+}

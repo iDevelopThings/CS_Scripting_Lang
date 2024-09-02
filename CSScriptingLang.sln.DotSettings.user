@@ -1,0 +1,285 @@
+﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AAssemblyName_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003Fecfda295482784bd65d11791a8344e16826436a9fce93ab4bd1891f59f3c_003FAssemblyName_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AAssembly_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003Fb2b836b4a16ec2a5a76cf2a2296c92cb3f2c47f84ea33e8755011472abb89_003FAssembly_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003ABr_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FDecompilerCache_003Fdecompiler_003Ff0a88b4e75dd4ab488ca222e859a3de025200_003F65_003F94b47397_003FBr_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003ACastHelpers_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003F59109b68aa8966a8b4c17bb8642684239e9598dc1f117d294c355534a932786_003FCastHelpers_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003ACodeWriter_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FDecompilerCache_003Fdecompiler_003Ff4cd3abfa216415592a6fa3ec307c1972200_003F56_003F0d98b09d_003FCodeWriter_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AColors_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FDecompilerCache_003Fdecompiler_003Ff0a88b4e75dd4ab488ca222e859a3de025200_003F2d_003F6e209694_003FColors_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003ADefaultInterpolatedStringHandler_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003Fc1c946eaa6d8ddaaea1b63e936ca8ed2791d9316c5b025a41d445891e8a59ecd_003FDefaultInterpolatedStringHandler_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AFileSystemEnumerator_002EWindows_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003F422299c1e1233f1a20b8c0654281f74792424fe87e29abaf4ecfcd0cd64d718_003FFileSystemEnumerator_002EWindows_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AIncrementalContexts_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003F84b61ad53687e2aaaf3d6ca418b2912d872d865eaf3a1d164e9ac95ccb7fcf_003FIncrementalContexts_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AInlineContainer_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FDecompilerCache_003Fdecompiler_003Ff0a88b4e75dd4ab488ca222e859a3de025200_003F88_003F09de427a_003FInlineContainer_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AJsonSerializer_002ERead_002EStream_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003Fdd9117eb1cbafbb02a87969294977b5ee6c4d6d855d4f08ebbce9a739c179d31_003FJsonSerializer_002ERead_002EStream_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AListView_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003F9624e55f9641ad55cf3ebe2298987f607aa7d993152e4d551c232fcb08722_003FListView_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AList_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003Fb7208b3f72528d22781d25fde9a55271bdf2b5aade4f03b1324579a25493cd8_003FList_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003ARow_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FDecompilerCache_003Fdecompiler_003Ff0a88b4e75dd4ab488ca222e859a3de025200_003F8e_003F6a05c923_003FRow_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003ARuntimeHandles_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003Fc796e07724a4f9be8a72c1d8bf9d1ff583a3cb938fba3d1a63c9de159a107980_003FRuntimeHandles_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003ASafeFileHandle_002EWindows_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003F261ea83c988816e3d8fe76b15b7ac6c10af64b8f9e739854f83c137c8ba9_003FSafeFileHandle_002EWindows_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AScope_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003F906cc58a288f231b7691c65c8cfbcff9eb9fc0ffc5d066e8091816d4f2861_003FScope_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003ASelect_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003F20885d5d627d4da82a4a22d7c55abb3d50afdd1ab121738514d59792dc9993_003FSelect_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003ASpan_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FDecompilerCache_003Fdecompiler_003Ff0a88b4e75dd4ab488ca222e859a3de025200_003Fa3_003Fef0ef190_003FSpan_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AStack_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FDecompilerCache_003Fdecompiler_003Ff0a88b4e75dd4ab488ca222e859a3de025200_003Fbe_003F1cb01bfa_003FStack_002Ecs_002Fz_003A2_002D1/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AStack_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003F765c839166754e41fc112cd4ed43a57317733875fa91613703f6b883f9ab7a_003FStack_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AStringAsserts_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003F999ae9cc4ab7b7cfbc5080803e994426e97fd9d87c5b1f44544a799bc114_003FStringAsserts_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AString_002EManipulation_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003Fb05fc3ef644b7632d4481b3defa11634da02637d896cb5eca3eca7cf2f3ee3_003FString_002EManipulation_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003ASyntax_002Exml_002ESyntax_002EGenerated_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003Fca521bac40d6b8fbb6933b471866997e76c5ece_003FSyntax_002Exml_002ESyntax_002EGenerated_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003ATestInvoker_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003Ff5545b2656401abe1a371ad2756d7d2328a38293f7ee8b163801bbf55cee8_003FTestInvoker_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AThemeManager_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003Fc968d6c0e977f11391a3c940f646f81ff7157cbc1da6e34226ad753a907ade_003FThemeManager_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AThrowHelper_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003F2c8e7ca976f350cba9836d5565dac56b11e0b56656fa786460eb1395857a6fa_003FThrowHelper_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AThrowHelper_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003Fc7da56581ee7b20208f09e80b735961e4d5d7b9e5562bfdec94a75c57b391_003FThrowHelper_002Ecs_002Fz_003A2_002D1/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AToken_002Eg_002Ecs_002Fl_003AC_0021_003FUsers_003FSam8t_003FAppData_003FLocal_003FJetBrains_003FShared_003FvAny_003FSourcesCache_003F1e287cce5fb875ce5067fd2ac7345fb39ff879c7_003FToken_002Eg_002Ecs_002Fz_003A2_002D1/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/Environment/AssemblyExplorer/XmlDocument/@EntryValue">&lt;AssemblyExplorer&gt;&#xD;
+  &lt;Assembly Path="C:\Users\Sam8t\.nuget\packages\terminal.gui\1.17.1\lib\net8.0\Terminal.Gui.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Users\Sam8t\.nuget\packages\terminal.gui.v2desktop\2024.5.15.1\lib\net8.0\Terminal.Gui.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Users\Sam8t\.nuget\packages\alba.csconsoleformat\1.0.0\lib\netstandard2.0\Alba.CsConsoleFormat.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Users\Sam8t\.nuget\packages\codewriter\0.3.0\lib\net45\CodeWriter.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Users\Sam8t\.nuget\packages\xunit.extensibility.core\2.5.3\lib\netstandard1.1\xunit.core.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Users\Sam8t\.nuget\packages\jetbrains.annotations\2024.2.0\lib\netstandard2.0\JetBrains.Annotations.dll" /&gt;&#xD;
+&lt;/AssemblyExplorer&gt;</s:String>
+	<s:Boolean x:Key="/Default/Environment/Hierarchy/Build/BuildTool/AutoDownloadSdk/@EntryValue">False</s:Boolean>
+	<s:String x:Key="/Default/Environment/Hierarchy/Build/SolBuilderDuo/UseMsbuildSolutionBuilder/@EntryValue">No</s:String>
+	<s:Int64 x:Key="/Default/Environment/IndexEventsCount/SymbolEventsNotPersistedCount/@EntryValue">-3177</s:Int64>
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	<s:Boolean x:Key="/Default/Environment/UnitTesting/CreateUnitTestDialog/ShowAdvancedOptions/@EntryValue">True</s:Boolean>
+	<s:String x:Key="/Default/Environment/UnitTesting/CreateUnitTestDialog/TestProjectMapping/=0867DBEF_002D42FE_002D4881_002DBBE0_002DDC547A9CE97A/@EntryIndexedValue">EF6D755B-7704-4117-A584-92D7814F75D7</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/CreateUnitTestDialog/TestTemplateMapping/=NUnit3x/@EntryIndexedValue">db4927dd-2e12-48a7-9a84-2b7e3e31b9c8</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=2390eb45_002D7f37_002D47a5_002D9542_002Dd6154acaf353/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="Session #3" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;And&gt;&#xD;
+    &lt;Namespace&gt;LanguageTests.InterpreterTests&lt;/Namespace&gt;&#xD;
+    &lt;Project Location="F:\c#\CSScriptingLang\LanguageTests" Presentation="&amp;lt;LanguageTests&amp;gt;" /&gt;&#xD;
+    &lt;TestAncestor&gt;&#xD;
+      &lt;TestId&gt;NUnit3x::EF6D755B-7704-4117-A584-92D7814F75D7::net8.0::LanguageTests.InterpreterTests.LoopsTest&lt;/TestId&gt;&#xD;
+    &lt;/TestAncestor&gt;&#xD;
+  &lt;/And&gt;&#xD;
+&lt;/SessionState&gt;</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=705689a2_002D1168_002D459d_002Db238_002D2c2f78059ac7/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="Session #2" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;And&gt;&#xD;
+    &lt;Namespace&gt;LanguageTests.InterpreterTests&lt;/Namespace&gt;&#xD;
+    &lt;Project Location="F:\c#\CSScriptingLang\LanguageTests" Presentation="&amp;lt;LanguageTests&amp;gt;" /&gt;&#xD;
+    &lt;TestAncestor&gt;&#xD;
+      &lt;TestId&gt;NUnit3x::EF6D755B-7704-4117-A584-92D7814F75D7::net8.0::LanguageTests.InterpreterTests.LoopsTest&lt;/TestId&gt;&#xD;
+    &lt;/TestAncestor&gt;&#xD;
+    &lt;TestAncestor&gt;&#xD;
+      &lt;TestId&gt;NUnit3x::EF6D755B-7704-4117-A584-92D7814F75D7::net8.0::LanguageTests.InterpreterTests.LoopsTest.ForRange&lt;/TestId&gt;&#xD;
+    &lt;/TestAncestor&gt;&#xD;
+  &lt;/And&gt;&#xD;
+&lt;/SessionState&gt;</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=e2101b73_002D4578_002D4508_002Da304_002D1f4b7bbcc60a/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="Session" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;And&gt;&#xD;
+    &lt;Namespace&gt;LanguageTests.InterpreterTests&lt;/Namespace&gt;&#xD;
+    &lt;Project Location="F:\c#\CSScriptingLang\LanguageTests" Presentation="&amp;lt;LanguageTests&amp;gt;" /&gt;&#xD;
+    &lt;TestAncestor&gt;&#xD;
+      &lt;TestId&gt;NUnit3x::EF6D755B-7704-4117-A584-92D7814F75D7::net8.0::LanguageTests.InterpreterTests.LoopsTest&lt;/TestId&gt;&#xD;
+    &lt;/TestAncestor&gt;&#xD;
+    &lt;TestAncestor&gt;&#xD;
+      &lt;TestId&gt;NUnit3x::EF6D755B-7704-4117-A584-92D7814F75D7::net8.0::LanguageTests.InterpreterTests.LoopsTest.ForRange&lt;/TestId&gt;&#xD;
+    &lt;/TestAncestor&gt;&#xD;
+  &lt;/And&gt;&#xD;
+&lt;/SessionState&gt;</s:String>
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	</wpf:ResourceDictionary>

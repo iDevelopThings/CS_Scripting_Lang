@@ -1,0 +1,4 @@
+{
+  "$schema": "https://gui-cs.github.io/Terminal.Gui/schemas/tui-config-schema.json",
+  "Theme": "Dark"
+}
