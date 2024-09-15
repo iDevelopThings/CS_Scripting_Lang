@@ -81,4 +81,34 @@ public static class ReflectionExtensions
     public static object ReadValue(this PropertyInfo property, object target) {
         return property.GetValue(target, null);
     }
+    
+    public static bool IsAsync(this MethodInfo method) {
+        var rtType = method.ReturnType;
+        if(rtType == typeof(Task)) {
+            return true;
+        }
+        
+        if(rtType.IsGenericType() && rtType.GetGenericTypeDefinition() == typeof(Task<>)) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    public static IEnumerable<MemberInfo> GetPropertiesAndFields(this Type type, BindingFlags flags = BindingFlags.Public | BindingFlags.Instance) {
+        return type.GetProperties(flags).Cast<MemberInfo>().Concat(type.GetFields(flags));
+    }
+    
+    public static IEnumerable<StandaloneObjectMember> GetPropertyProxies(this Type type, BindingFlags flags = BindingFlags.Public | BindingFlags.Instance) {
+        foreach (var member in type.GetPropertiesAndFields(flags)) {
+            yield return new StandaloneObjectMember(member);
+        }
+    }
+    
+    public static IEnumerable<(MethodInfo, T)> MethodsWithAttribute<T>(this Type type, BindingFlags flags = BindingFlags.Public | BindingFlags.Instance) where T : Attribute {
+        return type.GetMethods(flags)
+                   .Select(method => (method, method.GetCustomAttribute<T>()))
+                   .Where(pair => pair.Item2 != null)
+                   .Select(pair => (pair.method, pair.Item2!));
+    }
 }

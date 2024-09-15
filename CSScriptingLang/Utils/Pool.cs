@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Reflection;
 
 namespace CSScriptingLang.Utils;
 
@@ -90,4 +91,24 @@ public class ObjectPool<T> where T : new()
                 disposable.Dispose();
         }
     }
+}
+
+
+
+public class SimpleObjectPool<T>
+{
+    private static readonly ConcurrentBag<T> _objects        = new();
+    private static readonly Func<T>          _objectGenerator = Activator.CreateInstance<T>;
+
+    static SimpleObjectPool() {
+        // check if `T` has a static `CreatePooledObject` method
+        var method = typeof(T).GetMethod("CreatePooledObject", BindingFlags.Static | BindingFlags.Public);
+        if (method != null) {
+            _objectGenerator = () => (T) method.Invoke(null, null);
+        }
+    }
+
+    public static T Get() => _objects.TryTake(out var item) ? item : _objectGenerator();
+
+    public static void Return(T item) => _objects.Add(item);
 }

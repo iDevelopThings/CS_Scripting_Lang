@@ -1,45 +1,54 @@
-﻿using CSScriptingLang.Core.FileSystem;
+﻿using System.Diagnostics;
+using CSScriptingLang.Core.FileSystem;
 using CSScriptingLang.Interpreter;
+using CSScriptingLang.Interpreter.Context;
+using CSScriptingLang.Interpreter.Execution.Expressions;
+using CSScriptingLang.Interpreter.Modules;
 using CSScriptingLang.Lexing;
 using CSScriptingLang.Parsing;
 using CSScriptingLang.Parsing.AST;
+using CSScriptingLang.RuntimeValues.Types;
+using CSScriptingLang.RuntimeValues.Values;
 
 namespace LanguageTests;
 
 public class BaseCompilerTest
 {
-    public FileSystem  FileSystem  { get; set; }
-    public Interpreter Interpreter { get; set; }
+    public InterpreterFileSystem FileSystem  { get; set; }
+    public Interpreter           Interpreter { get; set; }
+    public ExecContext           Ctx         { get; set; }
 
-    public InterpreterExecutionContext Context => Interpreter.Context;
-    public SymbolTable                 Symbols => Interpreter.Symbols;
+    public ModuleResolver ModuleResolver => Interpreter.ModuleResolver;
+    public VariablesStack Variables      => Ctx.Variables;
+    public FunctionsStack Functions      => Ctx.Functions;
+
+    public string          MainFilePath { get; set; }
+    public InterpreterFile MainFile     { get; set; }
 
     private bool _trackFunctionFrames;
+#pragma warning disable CS0414 // Field is assigned but its value is never used
     private bool _logScopeEvents = false;
+#pragma warning restore CS0414 // Field is assigned but its value is never used
 
-    public List<FunctionExecutionFrame> FunctionFramesPushed { get; } = new();
-    public List<FunctionExecutionFrame> FunctionFramesPopped { get; } = new();
+    public List<Frame> FunctionFramesPushed { get; } = new();
+    public List<Frame> FunctionFramesPopped { get; } = new();
 
     public BaseCompilerTest() {
-        InterpreterEvents.OnExecutionScopePushed += context => {
-            if (_logScopeEvents)
-                Console.WriteLine($"Scope Pushed: {context.Module.Name}");
-        };
-        InterpreterEvents.OnExecutionScopePopped += context => {
-            if (_logScopeEvents)
-                Console.WriteLine($"Scope Popped: {context.Module.Name}");
-        };
+        Directory.SetCurrentDirectory("F:\\c#\\CSScriptingLang\\LanguageTests");
+
+        ErrorWriter.FatalErrorHandlingMethod = FatalErrorHandlingMethodType.ThrowException;
+
         InterpreterEvents.OnFunctionFramePushed += frame => {
             if (_trackFunctionFrames) {
-                if (_logScopeEvents)
-                    Console.WriteLine($"Function Frame Pushed: {frame.Name}");
+                // if (_logScopeEvents)
+                //     Console.WriteLine($"Function Frame Pushed: {frame.Name}");
                 FunctionFramesPushed.Add(frame);
             }
         };
         InterpreterEvents.OnFunctionFramePopped += frame => {
             if (_trackFunctionFrames) {
-                if (_logScopeEvents)
-                    Console.WriteLine($"Function Frame Popped: {frame.Name}");
+                // if (_logScopeEvents)
+                //     Console.WriteLine($"Function Frame Popped: {frame.Name}");
                 FunctionFramesPopped.Add(frame);
             }
         };
@@ -50,83 +59,179 @@ public class BaseCompilerTest
         return this;
     }
 
-    public FunctionExecutionFrame GetPushedFrame(string name) {
+    public Frame GetPushedFrame(string name) {
         return FunctionFramesPushed.FirstOrDefault(f => f.Name == name);
     }
-    public FunctionExecutionFrame GetPoppedFrame(string name) {
+    public Frame GetPoppedFrame(string name) {
         return FunctionFramesPopped.FirstOrDefault(f => f.Name == name);
     }
-
-    public void SetupCompiler(bool isPhysical = false, string rootPath = "./") {
-        FileSystem  = new FileSystem(rootPath, isPhysical);
-        Interpreter = new Interpreter(FileSystem);
+    [OneTimeSetUp]
+    public void StartTest() {
+        Trace.Listeners.Add(new ConsoleTraceListener());
     }
-
+    [OneTimeTearDown]
+    public void EndTest() {
+        Trace.Flush();
+    }
     [SetUp]
     public void SetupBase() {
+        TypeTable.Current = new TypeTable(null, true);
+
         FunctionFramesPushed.Clear();
         FunctionFramesPopped.Clear();
 
         SetupCompiler();
     }
 
-    public (Lexer, Parser, ProgramNode) Parse(string source, bool printParseTree = true) {
-        var l = new Lexer(source);
-        var p = new Parser(l);
+    public void SetupCompiler(bool isPhysical = false, string rootPath = "./") {
+        var scriptsDir = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), rootPath, ".temp"));
+        rootPath = rootPath == "./" ? scriptsDir : rootPath;
+
+        if (rootPath == scriptsDir) {
+            if (!Directory.Exists(scriptsDir)) {
+                Directory.CreateDirectory(scriptsDir);
+            }
+        }
+
+        if (!isPhysical) {
+            // Delete all files in the directory
+            foreach (var file in Directory.GetFiles(scriptsDir)) {
+                File.Delete(file);
+            }
+
+            MainFilePath = Path.Combine(rootPath, $"{TestContext.CurrentContext.Test.ClassName}{TestContext.CurrentContext.Test.MethodName}.js");
+            if (!File.Exists(MainFilePath)) {
+                File.WriteAllText(MainFilePath, "");
+            }
+        }
+
+        FileSystem = new InterpreterFileSystem(rootPath, isPhysical);
+
+        if (!isPhysical) {
+            MainFile = FileSystem.AddFile(MainFilePath, "");
+        }
+
+        Interpreter = new Interpreter(FileSystem);
+        Ctx         = Interpreter.GetNewExecContext();
+
+    }
+
+    public ProgramExpression Parse(string source, bool printParseTree = true) {
+        var standaloneParser = new StandaloneParser(source);
+        var program          = standaloneParser.Parse(false);
 
         if (printParseTree) {
-            Console.WriteLine(p.Program.ToString(0));
+            Console.WriteLine(program.ToString(0));
             Console.WriteLine(new string('-', 20));
         }
 
-        return (l, p, p.Program);
+        return program;
     }
 
-    public Interpreter Execute(string source, bool printParseTree = true, string moduleName = "main", Action<Interpreter> setup = null) {
+    public Expression ParseExpression(string source) {
+        var standaloneParser = new StandaloneParser(source);
+        var program          = standaloneParser.ParseExpressionNodes();
+
+        return program.First();
+    }
+
+
+    public Interpreter Execute(string str, bool printParseTree = true, string moduleName = "main", Action<Interpreter> setup = null) {
+        if (!str.Contains("module \"main\";") && !str.Contains("module 'main';")) {
+            str = $"module \"{moduleName}\";\n{str}";
+        }
+
+        // Assert.DoesNotThrow(() => {
         try {
-            return ExecuteModules(source, printParseTree, moduleName, setup);
+            ExecuteNewModuleSystem(str, printParseTree, moduleName, setup);
         }
-        catch (Exception e) {
-            Console.WriteLine(e);
-            throw;
+        catch (Exception e) when (e is BaseLanguageException || e is CompilationException) {
+            if (!FileSystem.IsPhysical) {
+                File.WriteAllText(MainFilePath, str);
+            }
+
+            Interpreter.Logger.Exception(e);
+
         }
-    }
-
-    public Interpreter ExecuteFromDiskModules(string source, string diskRootPath, string mainModuleName = "main", Action<Interpreter> setup = null) {
-        SetupCompiler(true, diskRootPath);
-
-        if (!string.IsNullOrWhiteSpace(source)) {
-            Interpreter.FileSystem.CreateFile($"{mainModuleName}.js", source);
-        }
-
-        var mainModule = Interpreter.ModuleRegistry.LoadModule(mainModuleName);
-
-        setup?.Invoke(Interpreter);
-        Interpreter.Execute(mainModule);
+        // });
 
         return Interpreter;
     }
 
-    public Interpreter ExecuteModules(string source, bool printParseTree = true, string moduleName = "main", Action<Interpreter> setup = null) {
+    public Interpreter ExecuteFromDiskModules(string source, string diskRootPath = "./", string mainModuleName = "main", Action<Interpreter> setup = null) {
+        Assert.DoesNotThrow(() => {
+            try {
+                SetupCompiler(true, diskRootPath);
+
+                if (!string.IsNullOrWhiteSpace(source)) {
+                    Interpreter.FileSystem.AddFile($"{mainModuleName}.js", source);
+                }
+
+                Ctx = new ExecContext();
+
+                ModuleResolver.Load(Ctx);
+
+                var mModule = ModuleResolver.MainModule;
+                var mScript = ModuleResolver.MainScript;
+
+                Assert.Multiple(() => {
+                    Assert.That(mModule, Is.Not.Null);
+                    Assert.That(mScript, Is.Not.Null);
+                });
+
+                setup?.Invoke(Interpreter);
+
+                Ctx = Interpreter.Execute(Ctx);
+            }
+            catch (Exception e) when (e is BaseLanguageException) {
+                // TestContext.Error.WriteLine(e.Message);
+                // throw new InterpreterTestExecutionException(e);
+                Interpreter.Logger.Exception(e);
+            }
+        });
+
+
+        return Interpreter;
+    }
+
+    public Interpreter ExecuteNewModuleSystem(string source, bool printParseTree = true, string moduleName = "main", Action<Interpreter> setup = null) {
         if (FileSystem.IsPhysical) {
             SetupCompiler(false);
+        } else {
+            MainFile.Content = source;
         }
 
-        Interpreter.FileSystem.CreateFile($"{moduleName}.js", source);
+        ModuleResolver.Load(Ctx);
 
-        var mainModule = Interpreter.ModuleRegistry.LoadModule(moduleName);
+        Ctx.Module = ModuleResolver.MainModule;
 
         setup?.Invoke(Interpreter);
-        Interpreter.Execute(mainModule);
+
+        Ctx = Interpreter.ExecuteStandalone(Ctx);
 
         return Interpreter;
     }
 
-    public (Interpreter, Symbol) ExecuteSingleExpression(string expr, bool printParseTree = true) {
-        var interp = Execute($@"
-            var result = {expr};
-        ", printParseTree);
 
-        return (interp, interp.Symbols["result"]);
+    public Value ExecuteSimpleExpression(string expr) {
+        Assert.DoesNotThrow(() => {
+            try {
+                ExecuteNewModuleSystem(
+                    $"""
+                     module "main";
+                     var result = {expr};
+                     """
+                );
+            }
+            catch (Exception e) when (e is BaseLanguageException) {
+                Interpreter.Logger.Exception(e);
+            }
+        });
+
+        var result = Ctx.Variables["result"];
+
+        return result?.Val;
     }
+
+
 }

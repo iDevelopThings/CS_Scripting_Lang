@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
+using CSScriptingLangGenerators.Bindings;
 using CSScriptingLangGenerators.Utils;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -13,16 +14,6 @@ namespace CSScriptingLangGenerators;
 [Generator]
 public class VirtualMachineInstructionHandlerSourceGenerator : IIncrementalGenerator
 {
-    private static readonly DiagnosticDescriptor MissingInstructionHandlerMethod = new(
-        "CSSG002",
-        "Missing instruction handler method",
-        "[{0}] Missing handler method: private void On{1}({0} inst)",
-        "VirtualMachine",
-        DiagnosticSeverity.Warning,
-        true
-    );
-
-
     public void Initialize(IncrementalGeneratorInitializationContext context) {
         var provider = context.SyntaxProvider.CreateSyntaxProvider(
             (s,   _) => s is ClassDeclarationSyntax {Identifier.Text: "VirtualMachine"},
@@ -196,7 +187,7 @@ public class VirtualMachineInstructionHandlerSourceGenerator : IIncrementalGener
         foreach (var missingMethod in missingMethods) {
             context.ReportDiagnostic(
                 Diagnostic.Create(
-                    MissingInstructionHandlerMethod,
+                    Diagnostics.MissingInstructionHandlerMethod,
                     missingMethod.Locations[0],
                     missingMethod.Name,
                     missingMethod.ShortName

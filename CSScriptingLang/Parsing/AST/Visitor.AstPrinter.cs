@@ -1,5 +1,7 @@
 ﻿using CSScriptingLang.Lexing;
-using CSScriptingLang.Utils.CodeWriter;
+using CSScriptingLang.Common.CodeWriter;
+using CSScriptingLang.Interpreter.Execution.Expressions;
+using CSScriptingLang.Interpreter.Execution.Statements;
 
 namespace CSScriptingLang.Parsing.AST;
 
@@ -17,34 +19,23 @@ public partial class ASTPrintingVisitor : BaseAstVisitor
         });
     }
 
-    public override void VisitProgramNode(ProgramNode node) {
-        w._($"ProgramNode");
-        base.VisitProgramNode(node);
+    public override void VisitProgramExpression(ProgramExpression node) {
+        w._($"ProgramExpression");
+        base.VisitProgramExpression(node);
 
         Console.WriteLine(w.ToString());
     }
-    public override void VisitFunctionDeclarationNode(FunctionDeclarationNode node) {
-        base.VisitFunctionDeclarationNode(node);
-    }
-    public override void VisitNumberNode(NumberNode node) {
-        w.WriteInline($"Number({node.Value})");
-
-        base.VisitNumberNode(node);
-    }
-    public override void VisitStringNode(StringNode node) {
-        w.WriteInline($"String({node.Value})");
-        base.VisitStringNode(node);
+    public override void VisitStringExpression(StringExpression node) {
+        w.WriteInline($"String({node.NativeValue})");
+        base.VisitStringExpression(node);
     }
     public override void VisitExpressionListNode(ExpressionListNode node) {
         w.WriteInline($"(");
         base.VisitExpressionListNode(node);
         w.WriteInline($")");
     }
-    public override void VisitVariableNode(VariableNode node) {
-        w.WriteInline($"Variable({node.Name})");
-        base.VisitVariableNode(node);
-    }
-    public override void VisitBinaryOperationNode(BinaryOperationNode node) {
+    
+    public override void VisitBinaryOpExpression(BinaryOpExpression node) {
         if (!_visitedNodes.Add(node))
             return;
 
@@ -52,63 +43,60 @@ public partial class ASTPrintingVisitor : BaseAstVisitor
         w.WriteInline($" {node.Operator.ToSymbol()} ");
         node.Right?.Accept(this);
     }
-    public override void VisitUnaryOperationNode(UnaryOperationNode node) {
-        w._($"UnaryOperationNode");
-        base.VisitUnaryOperationNode(node);
+    public override void VisitUnaryOpExpression(UnaryOpExpression node) {
+        w._($"UnaryOpExpression");
+        base.VisitUnaryOpExpression(node);
 
     }
-    public override void VisitObjectLiteralNode(ObjectLiteralNode node) {
-        using var _ = w.b($"ObjectLiteralNode");
-        base.VisitObjectLiteralNode(node);
+    public override void VisitObjectLiteralExpression(ObjectLiteralExpression node) {
+        using var _ = w.b($"ObjectLiteralExpression");
+        base.VisitObjectLiteralExpression(node);
     }
     public override void VisitObjectProperty(ObjectProperty node) {
         w.WriteInlineIndented($"{node.Name}: ");
         base.VisitObjectProperty(node);
 
     }
-    public override void VisitPropertyAccessNode(PropertyAccessNode node) {
-        base.VisitPropertyAccessNode(node);
+    public override void VisitMemberAccessExpression(MemberAccessExpression node) {
+        base.VisitMemberAccessExpression(node);
 
-        w.WriteInline($".{node.Name}");
+        w.WriteInline($".{node.Identifier}");
     }
-    public override void VisitIndexAccessNode(IndexAccessNode node) {
-        w._($"IndexAccessNode");
-        base.VisitIndexAccessNode(node);
+    public override void VisitIndexAccessExpression(IndexAccessExpression node) {
+        w._($"IndexAccessExpression");
+        base.VisitIndexAccessExpression(node);
 
     }
-    public override void VisitBlockNode(BlockNode node) {
+    public override void VisitBlockExpression(BlockExpression node) {
         using var _ = w.b($"");
-        base.VisitBlockNode(node);
+        base.VisitBlockExpression(node);
     }
-    public override void VisitAssignmentNode(AssignmentNode node) {
-        w.WriteInline($" = ");
-        base.VisitAssignmentNode(node);
-    }
-    public override void VisitFunctionCallNode(FunctionCallNode node) {
+
+    public override void VisitCallExpression(CallExpression node) {
         if (node.Variable != null) {
             node.Variable.Accept(this);
             if(node.Name != null) {
                 w.WriteInline($".{node.Name}");
             }
         } else {
-            w.WriteInline($"{node.Name ?? node.VariableName ?? "UNKNOWN FUNCTION NAME??"}");
+            w.WriteInline($"{node.Name ?? node.Identifier ?? "UNKNOWN FUNCTION NAME??"}");
         }
         
         node.Arguments.Accept(this);
 
-        // base.VisitFunctionCallNode(node);
+        // base.VisitCallExpression(node);
     }
     public override void VisitIfStatementNode(IfStatementNode node) {
         w._($"IfStatementNode");
         base.VisitIfStatementNode(node);
 
     }
-    public override void VisitForLoopNode(ForLoopNode node) {
-        w._($"ForLoopNode");
-        base.VisitForLoopNode(node);
+    public override void VisitForLoopStatement(ForLoopStatement node) {
+        w._($"ForLoopStatement");
+        base.VisitForLoopStatement(node);
 
     }
-    public override void VisitReturnStatementNode(ReturnStatementNode node) {
+    public override void VisitReturnStatement(ReturnStatement node) {
         if (!_visitedNodes.Add(node))
             return;
 
@@ -122,7 +110,6 @@ public partial class ASTPrintingVisitor : BaseAstVisitor
 
     public override void VisitVariableDeclarationNode(VariableDeclarationNode node) {
         w.WriteInline("\n");
-        w.WriteInline($"var {node.VariableName}");
         base.VisitVariableDeclarationNode(node);
         w.WriteInline($";\n");
     }
@@ -136,15 +123,15 @@ public partial class ASTPrintingVisitor : BaseAstVisitor
             return;
         w.WriteInline($"({string.Join(", ", node.Arguments.Select(x => $"{x.Type} {x.Name}"))})");
     }
-    public override void VisitInlineFunctionDeclarationNode(InlineFunctionDeclarationNode node) {
+    public override void VisitInlineFunctionDeclaration(InlineFunctionDeclaration node) {
         if (!_visitedNodes.Add(node))
             return;
 
         w.WriteInline($"function");
         node.Parameters?.Accept(this);
 
-        node.Body?.Accept(this);
-        // base.VisitInlineFunctionDeclarationNode(node);
+        // node.Body?.Accept(this);
+        // base.VisitInlineFunctionDeclaration(node);
 
     }
 

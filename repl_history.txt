@@ -1,0 +1,7 @@
+var x = 1;
+x * 10;
+x
+x += 10;
+x
+var obj = {testing : function() { return 'hi'; }};
+obj.testing()

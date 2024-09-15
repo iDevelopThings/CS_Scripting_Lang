@@ -104,7 +104,7 @@ public struct ScopeTimer : IDisposable
 public struct ClassScopedTimer<T>
 {
     public static Logger Logger = Logs.Get($"TIMER<{typeof(T).Name}>");
-    
+
     public static void SetColorFn(Func<string, string> fn) {
         Logger.ColorName = fn;
     }
@@ -118,6 +118,115 @@ public struct ClassScopedTimer<T>
     public static ScopedTimer<T> New([CallerMemberName] string scopeName = "") => ScopedTimer<T>.New(scopeName);
 
     public static ScopedTimer<T> NewPrefixed(string prefix, [CallerMemberName] string scopeName = "") => ScopedTimer<T>.NewPrefixed(prefix, scopeName);
+}
+
+public class ClassScopedTimerInst
+{
+    public Logger Logger = Logs.Get($"TIMER");
+
+    public ClassScopedTimerInst(Logger inLogger = null, string name = null) {
+        if (name != null)
+            Logger.SetName(name);
+
+        if (inLogger != null) {
+            Logger.SetLogLevel(inLogger.GetLogLevel());
+            Logger.ColorName = inLogger.ColorName;
+            Logger.SetName($"TIMER<{inLogger.GetName()}>");
+        }
+    }
+
+    public ClassScopedTimerInst SetColorFn(Func<string, string> fn) {
+        Logger.ColorName = fn;
+        return this;
+    }
+
+    public ClassScopedTimerInst SetName(string name) {
+        Logger.SetName(name);
+        return this;
+    }
+
+    public static ClassScopedTimerInst Create(Logger inLogger) => new(inLogger);
+
+
+    public ScopedTimer NewWith(string scopeName) => ScopedTimer.NewWith(Logger, scopeName);
+
+    public ScopedTimer New([CallerMemberName] string scopeName = "") => ScopedTimer.New(Logger, scopeName);
+
+    public ScopedTimer NewPrefixed(string prefix, [CallerMemberName] string scopeName = "") => ScopedTimer.NewPrefixed(Logger, prefix, scopeName);
+}
+
+public class ClassScopedTimerInst<T>
+{
+    public static Logger Logger = null;
+
+    public ClassScopedTimerInst(Logger inLogger = null) {
+        if (Logger == null)
+            Logger = Logs.Get($"TIMER<{typeof(T).Name}>");
+
+        if (inLogger != null) {
+            Logger.SetLogLevel(inLogger.GetLogLevel());
+            Logger.ColorName = inLogger.ColorName;
+            Logger.SetName($"TIMER<{inLogger.GetName()}>");
+        }
+    }
+
+    public ClassScopedTimerInst<T> SetColorFn(Func<string, string> fn) {
+        Logger.ColorName = fn;
+        return this;
+    }
+
+    public ClassScopedTimerInst<T> SetName(string name) {
+        Logger.SetName(name);
+        return this;
+    }
+
+    public static ClassScopedTimerInst<T> Create(Logger inLogger) => new(inLogger);
+
+    public ScopedTimer NewWith(string scopeName) => ScopedTimer.NewWith(Logger, scopeName);
+
+    public ScopedTimer New([CallerMemberName] string scopeName = "") => ScopedTimer.New(Logger, scopeName);
+
+    public ScopedTimer NewPrefixed(string prefix, [CallerMemberName] string scopeName = "") => ScopedTimer.NewPrefixed(Logger, prefix, scopeName);
+}
+
+public struct ScopedTimer : IDisposable
+{
+    private readonly Stopwatch _stopwatch;
+    private readonly string    _scopeName;
+
+    private Logger Logger;
+
+    public ScopedTimer(Logger logger, [CallerMemberName] string scopeName = "") {
+        Logger = logger;
+        _scopeName = scopeName;
+        _stopwatch = ObjectPool<Stopwatch>.Rent();
+        _stopwatch.Start();
+    }
+
+    public static ScopedTimer NewWith(Logger logger, string scopeName) {
+        return new ScopedTimer(logger, scopeName);
+    }
+    public static ScopedTimer New(Logger logger, [CallerMemberName] string scopeName = "") {
+        return new ScopedTimer(logger, scopeName);
+    }
+    public static ScopedTimer NewPrefixed(Logger logger, string prefix, [CallerMemberName] string scopeName = "") {
+        return new ScopedTimer(logger, $"{prefix} -> {scopeName}");
+    }
+
+    public void Start() => _stopwatch.Restart();
+    public void Stop() {
+
+        _stopwatch.Stop();
+
+        var elapsed = _stopwatch.Elapsed;
+
+        Logger.Debug($"[{_scopeName}] -> {elapsed.ToColoredTimeString()}");
+
+        _stopwatch.Reset();
+        ObjectPool<Stopwatch>.Return(_stopwatch);
+    }
+
+    public void Dispose() => Stop();
 }
 
 public struct ScopedTimer<T> : IDisposable

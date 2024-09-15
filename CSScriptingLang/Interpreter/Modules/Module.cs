@@ -1,145 +1,91 @@
-﻿using CSScriptingLang.Parsing;
-using CSScriptingLang.Parsing.AST;
-using CSScriptingLang.RuntimeValues;
-using CSScriptingLang.Utils;
+﻿using CSScriptingLang.Parsing.AST;
+using CSScriptingLang.RuntimeValues.Types;
+using CSScriptingLang.RuntimeValues.Values;
 
 namespace CSScriptingLang.Interpreter.Modules;
 
-public class Module : BaseNode
+public class ModuleDeclarations : ModuleScriptDeclarations
 {
-    public string Name { get; }
+    public virtual Dictionary<string, RuntimeTypeInfo_Struct>      StructsByName                  { get; set; } = new();
+    public virtual Dictionary<string, RuntimeType>                 InterfacesByName               { get; set; } = new();
+    public virtual Dictionary<string, RuntimeTypeInfo_Signal>      SignalsByName                  { get; set; } = new();
+    public virtual Dictionary<string, Value>                       FunctionsByName                { get; set; } = new();
+    public virtual Dictionary<string, DefDeclaration_FunctionNode> DefFunctionsDeclarationsByName { get; set; } = new();
+    public virtual Dictionary<string, VariableSymbol>              VariablesByName                { get; set; } = new();
 
-    public ModuleRegistry Registry { get; set; }
+    public virtual void Add(ModuleScriptDeclarations scriptDeclarations) {
+        TopLevelDeclarations.UnionWith(scriptDeclarations.TopLevelDeclarations);
 
-    public Dictionary<string, Script> Scripts { get; } = new();
+        StructTypes.UnionWith(scriptDeclarations.StructTypes);
+        StructsByName = StructTypes.ToDictionary(structType => structType.Name);
 
-    private Dictionary<string, FunctionDeclarationNode> Functions { get; } = new();
-    private Dictionary<string, VariableDeclarationNode> Variables { get; } = new();
+        InterfaceTypes.UnionWith(scriptDeclarations.InterfaceTypes);
+        InterfacesByName = InterfaceTypes.ToDictionary(interfaceType => interfaceType.Name);
 
-    public Action<Module, string, FunctionDeclarationNode> OnFunctionRegistered;
-    public Action<Module, string, VariableDeclarationNode> OnVariableRegistered;
+        SignalTypes.UnionWith(scriptDeclarations.SignalTypes);
+        SignalsByName = SignalTypes.ToDictionary(signalType => signalType.Name);
 
-    public  Action<ProgramNode> OnProgramSet;
-    private ProgramNode         _program;
-    public ProgramNode Program {
-        get => _program;
-        set {
-            _program = value;
-            OnProgramSet?.Invoke(value);
-        }
-    }
+        FunctionTypes.UnionWith(scriptDeclarations.FunctionTypes);
+        FunctionsByName = FunctionTypes.ToDictionary(functionType => functionType.As.Fn().Name);
 
-    public IEnumerable<ITopLevelDeclarationNode> Declarations => Program?.Cursor.All.Of<ITopLevelDeclarationNode>() ?? [];
+        DefFunctionDeclarations.UnionWith(scriptDeclarations.DefFunctionDeclarations);
+        DefFunctionsDeclarationsByName = DefFunctionDeclarations.ToDictionary(functionType => functionType.Name);
 
-    public bool IsCompileable { get; set; }
-    public bool Compiled      { get; set; }
-
-    public Module(string name) {
-        Name = name;
-    }
-
-    public virtual void RegisterGlobals() { }
-
-    public void Register(FunctionDeclarationNode function) {
-        Functions[function.Name] = function;
-        OnFunctionRegistered?.Invoke(this, function.Name, function);
-    }
-    public void Register(VariableDeclarationNode variable) {
-        Variables[variable.VariableName] = variable;
-        OnVariableRegistered?.Invoke(this, variable.VariableName, variable);
-    }
-    public string PrefixName(string ToPrefix) {
-        return $"{Name}.{ToPrefix}";
-    }
-
-    public bool HasVariable(string name) => Variables.ContainsKey(name);
-    public bool HasFunction(string name) => Functions.ContainsKey(name);
-
-    public bool                    GetVariable(string name, out VariableDeclarationNode variable) => Variables.TryGetValue(name, out variable);
-    public VariableDeclarationNode GetVariable(string name) => Variables[name];
-
-    public bool                    GetFunction(string name, out FunctionDeclarationNode function) => Functions.TryGetValue(name, out function);
-    public FunctionDeclarationNode GetFunction(string name) => Functions[name];
-    public void SetDeclarations() {
-        if (Program == null)
-            return;
-
-        foreach (var declNode in Program.Cursor.All.Of<ITopLevelDeclarationNode>()) {
-            if (declNode is FunctionDeclarationNode fn) {
-                Register(fn);
-            } else if (declNode is VariableDeclarationNode var) {
-                Register(var);
-            }
-        }
-    }
-    public void Compile() {
-        using var _ = ScopeTimer.NewWith($"Compiling module '{Name.BoldBrightWhite()}'");
-
-        if (!IsCompileable)
-            return;
-        if (Compiled)
-            return;
-
-        Compiled = true;
-
-        var program = new ProgramNode();
-
-        foreach (var pair in Scripts) {
-            var parser = new Parser(pair.Value);
-            pair.Value.Program = parser.Program;
-            pair.Value.Parser  = parser;
-        }
-
-        foreach (var script in Scripts.Values) {
-            program.Combine(script.Program);
-        }
-
-        program.Parent = this;
-        Program        = program;
+        VariableDeclarations.UnionWith(scriptDeclarations.VariableDeclarations);
+        VariablesByName = VariableDeclarations.ToDictionary(variable => variable.Name);
     }
 }
 
-public class GlobalModule : Module
+public class Module
 {
-    public static GlobalModule Instance { get; } = new();
+    public string Name          { get; set; }
+    public string DirectoryPath { get; set; }
 
-    public GlobalModule() : base("global") { }
+    public bool IsMainModule { get; set; }
 
-    public override void RegisterGlobals() {
-        Register(new FunctionDeclarationNode("print") {
-            IsNative = true,
-            NativeFunction = (interpreter, frame) => {
-                var argCount = frame.Args.Count;
-                if (argCount == 0) {
-                    Console.WriteLine();
-                    return;
-                }
+    public List<Script> Scripts { get; set; } = new();
 
-                if (frame.Args[0].Type.Type == RTVT.String && argCount == 1) {
-                    Console.WriteLine(frame.Args[0].Value.Inspect());
-                    return;
-                }
+    public ModuleDeclarations Declarations = new();
 
-                if (frame.Args[0].Type.Type == RTVT.String) {
-                    var paramsObj = frame.Args.Skip(1)
-                       .Select(arg => arg.Value.Inspect())
-                       .ToArray();
-                    var str       = frame.Args[0].Value.Inspect();
-                    var formatted = string.Format(str, paramsObj);
-                    Console.WriteLine(formatted);
-                    return;
-                }
+    public Script MainScript { get; set; }
+    public Script TryGetMainScript() {
+        // Try to find the first with a `main` function
+        var s = Scripts.FirstOrDefault(script => script.IsMain);
+        if (s != null) {
+            return s;
+        }
 
-                for (int i = 0; i < argCount; i++) {
-                    Console.Write(frame.Args[i].Value.Inspect());
-                    if (i < argCount - 1)
-                        Console.Write(" ");
-                }
+        // Otherwise next we'll try to use an `index` script
+        s = Scripts.FirstOrDefault(script => script.NameWithoutExtension.ToLower() == "index");
+        if (s != null) {
+            return s;
+        }
 
-                if (argCount > 0)
-                    Console.WriteLine();
-            }
-        });
-
+        // Otherwise we'll just use the first script
+        return Scripts.FirstOrDefault();
     }
+
+    public Module(string name) {
+        Name         = name;
+        IsMainModule = name.ToLower() == "main";
+    }
+
+    public void AddScript(Script script) {
+        Scripts.Add(script);
+        script.Module = this;
+
+        TrySetOuterMostDirectory();
+    }
+
+    public void TrySetOuterMostDirectory() {
+        DirectoryPath = Scripts.Select(script => script.FilePath)
+           .OrderByDescending(path => path.Length)
+           .FirstOrDefault();
+    }
+
+    public Script GetScriptByPath(string filePath)
+        => Scripts.FirstOrDefault(script => script.FilePath == filePath);
+
+    public Script GetScriptByName(string scriptName)
+        => Scripts.FirstOrDefault(script => script.Name == scriptName);
 }

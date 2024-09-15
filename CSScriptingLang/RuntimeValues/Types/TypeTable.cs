@@ -1,111 +1,110 @@
 ﻿using System.Reflection;
-using CSScriptingLang.Interpreter;
+using CSScriptingLang.Interpreter.Execution.Expressions;
+using CSScriptingLang.Lexing;
+using CSScriptingLang.Parsing.AST;
+using CSScriptingLang.RuntimeValues.Prototypes;
+using CSScriptingLang.RuntimeValues.Values;
 using CSScriptingLang.Utils;
 
 namespace CSScriptingLang.RuntimeValues.Types;
 
-public static class StaticTypes
-{
-    public static RuntimeTypeInfo_Int32    Int32    = new();
-    public static RuntimeTypeInfo_Int64    Int64    = new();
-    public static RuntimeTypeInfo_Float    Float    = new();
-    public static RuntimeTypeInfo_Double   Double   = new();
-    public static RuntimeTypeInfo_String   String   = new();
-    public static RuntimeTypeInfo_Boolean  Boolean  = new();
-    public static RuntimeTypeInfo_Null     Null     = new();
-    public static RuntimeTypeInfo_Object   Object   = new();
-    public static RuntimeTypeInfo_Function Function = new();
-    public static RuntimeTypeInfo_Array    Array    = new();
-
-    public static Dictionary<RTVT, RuntimeTypeInfo> Types { get; } = new() {
-        {RTVT.Int32, Int32},
-        {RTVT.Int64, Int64},
-        {RTVT.Float, Float},
-        {RTVT.Double, Double},
-        {RTVT.String, String},
-        {RTVT.Boolean, Boolean},
-        {RTVT.Null, Null},
-        {RTVT.Object, Object},
-        {RTVT.Function, Function},
-        {RTVT.Array, Array},
-    };
-
-    public static Dictionary<Type, RuntimeTypeInfo> TypesByValueType { get; } = new() {
-        {typeof(int), Int32},
-        {typeof(long), Int64},
-        {typeof(float), Float},
-        {typeof(double), Double},
-        {typeof(string), String},
-        {typeof(bool), Boolean},
-        {typeof(Dictionary<string, RuntimeValue>), Object},
-        {typeof(RuntimeValue_Function), Function},
-        {typeof(List<RuntimeValue>), Array},
-    };
-}
 
 public class TypeTable : IDisposable
 {
-    public static TypeTable GlobalTypeTable { get; set; }
+    public static TypeTable Current { get; set; } = new(null, true);
 
-    public InterpreterExecutionContext InterpreterContext { get; set; }
-    public ExecutionContext            Context            { get; set; }
-    public TypeTable                   Parent             { get; set; }
+    public TypeTable Parent { get; set; }
 
-    public Dictionary<string, RuntimeTypeInfo> Types { get; } = new();
 
-    public Dictionary<RTVT, List<RuntimeTypeInfo>> TypesByType { get; } = new();
+    public HashSet<RuntimeType> Types { get; } = new();
+
+    public Dictionary<string, RuntimeType> TypesByName { get; } = new();
+    public Dictionary<string, RuntimeType> TypeAliases { get; } = new();
+
+    public Dictionary<RTVT, List<RuntimeType>> TypesByType { get; } = new();
+
+    // Holds types by their runtime type, for ex,
+    // `typeof(CSScriptingLang.RuntimeValues.Values.Object)` -> RuntimeTypeInfo_Object
+    public Dictionary<Type, List<RuntimeType>> TypesByRuntimeType { get; } = new();
 
     // This is essentially the raw native value type -> RuntimeTypeInfo mapping
-    public Dictionary<Type, RuntimeTypeInfo> TypesByValueType { get; } = new();
+    // For ex; typeof(int) -> RuntimeTypeInfo_Number, typeof(string) -> RuntimeTypeInfo_String
+    public Dictionary<Type, HashSet<RuntimeType>> TypesByValueType { get; } = new();
 
     // This is the type info class type -> RuntimeTypeInfo mapping
     // For ex; typeof(RuntimeTypeInfo_Number) -> Number, typeof(RuntimeTypeInfo_Object) -> Object
-    public Dictionary<Type, RuntimeTypeInfo> TypesByNativeType { get; } = new();
+    public Dictionary<Type, HashSet<RuntimeType>> TypesByNativeType { get; } = new();
 
     public static Dictionary<RTVT, int> UniqueTypeIds { get; } = new();
 
-    public TypeTable() { }
-    public TypeTable(InterpreterExecutionContext context, TypeTable parent) {
-        InterpreterContext = context;
-        Parent             = parent;
+    public TypeTable(TypeTable parent = null, bool isGlobal = false) {
+        if (parent != null) {
+            Parent = parent;
+        }
+
+        if (isGlobal) {
+            UniqueTypeIds?.Clear();
+
+            RegisterStaticTypes();
+        }
     }
 
-    public void RegisterStaticTypes() {
+
+    private void RegisterStaticTypes() {
         var staticTypes = typeof(StaticTypes)
            .GetFields(BindingFlags.Public | BindingFlags.Static)
-           .Where(p => p.FieldType.IsSubclassOf(typeof(RuntimeTypeInfo)))
+           .Where(p => p.FieldType.IsSubclassOf(typeof(RuntimeType)))
            .ToDictionary(p => p.Name, p => p);
 
         foreach (var pair in staticTypes) {
-            var rtType = (RuntimeTypeInfo) pair.Value.GetValue(null)!;
-            RegisterType(rtType);
+            var rtType    = (RuntimeType) pair.Value.GetValue(null)!;
+            var aliasAttr = pair.Value.GetCustomAttribute<StaticTypeAliasAttribute>();
+            RegisterType(rtType, aliasAttr?.Aliases);
             if (rtType.ValueType != null)
-                TypesByValueType[rtType.ValueType] = rtType;
+                TypesByValueType.GetOrAdd(rtType.ValueType).Add(rtType);
 
-            TypesByNativeType[rtType.GetType()] = rtType;
+            TypesByNativeType.GetOrAdd(rtType.GetType()).Add(rtType);
         }
-
-        /*
-        foreach (var typeInfo in TypeInfo.StaticTypes) {
-            var rtType = new RuntimeTypeInfo {
-                Type      = typeInfo.Type,
-                Name      = typeInfo.GetType().GetCustomAttribute<StaticTypeRegistrationAttribute>()!.Name,
-                ValueType = typeInfo.ValueType
-            };
-            RegisterType(rtType);
-
-            if (staticTypes.TryGetValue(rtType.Name, out var prop)) {
-                prop.SetValue(null, rtType);
-
-                rtType.IsPrimitive = true;
-            }
-        }*/
     }
 
-    public RuntimeTypeInfo this[string name] => Get(name);
+    public static RuntimeType GetFromValueType(object value) {
+        return Current.FromValueType(value);
+    }
+    public static RuntimeType TryGet(Type type) => Current.Get(type);
+    public static bool TryGet(Type type, out RuntimeType rtType) {
+        var r = Current.Get(type);
+        if (r != null) {
+            rtType = r;
+            return true;
+        }
 
+        rtType = null;
+        return false;
+    }
+    public static RuntimeType TryGet(RTVT type) => Current.Get(type);
+    public static bool TryGet(RTVT type, out RuntimeType rtType) {
+        var r = Current.Get(type);
+        if (r != null) {
+            rtType = r;
+            return true;
+        }
 
-    public RuntimeTypeInfo Get(Type type) {
+        rtType = null;
+        return false;
+    }
+    public static RuntimeType TryGet(string name) => Current.Get(name);
+    public static bool TryGet(string name, out RuntimeType rtType) {
+        var r = Current.Get(name);
+        if (r != null) {
+            rtType = r;
+            return true;
+        }
+
+        rtType = null;
+        return false;
+    }
+
+    public RuntimeType Get(Type type) {
         if (type == null)
             return StaticTypes.Null;
 
@@ -118,21 +117,21 @@ public class TypeTable : IDisposable
 
             {IsValueType: true} when type == typeof(bool)    => StaticTypes.Boolean,
             {IsValueType: false} when type == typeof(string) => StaticTypes.String,
-            // {IsValueType: false} when type == typeof(Dictionary<string, RuntimeValue>) => Object,
-            // {IsValueType: false} when type == typeof(RuntimeValue_Function)            => Function,
 
             _ => throw new ArgumentException($"Cannot convert type {type?.Name} to a runtime value type")
         };
     }
-    public RuntimeTypeInfo Get(RTVT type) {
-        if (TypesByType.TryGetValue(type, out var types)) {
-            return types.First();
+    public RuntimeType Get(RTVT type) {
+        return TypesByType.TryGetValue(type, out var types)
+            ? types.First()
+            : Parent?.Get(type);
+    }
+    public RuntimeType Get(string name) {
+        if (TypesByName.TryGetValue(name, out var type)) {
+            return type;
         }
 
-        return Parent?.Get(type);
-    }
-    public RuntimeTypeInfo Get(string name) {
-        if (Types.TryGetValue(name, out var type)) {
+        if (TypeAliases.TryGetValue(name, out type)) {
             return type;
         }
 
@@ -147,7 +146,7 @@ public class TypeTable : IDisposable
         return $"{type}_{id}";
     }
 
-    public RuntimeTypeInfo_Object RegisterObjectType(string name, RuntimeTypeInfo owner) {
+    public RuntimeTypeInfo_Object RegisterObjectType(string name, RuntimeType owner, params string[] aliases) {
         if (string.IsNullOrWhiteSpace(name))
             name = GenerateUniqueTypeId(RTVT.Object);
 
@@ -155,44 +154,71 @@ public class TypeTable : IDisposable
             Name  = name,
             Owner = owner,
         };
-        RegisterType(rtType);
+        RegisterType(rtType, aliases);
         return rtType;
     }
-    public RuntimeTypeInfo_Function RegisterFunctionType(string name, int index, RuntimeTypeInfo owner) {
+    public RuntimeTypeInfo_Function RegisterFunctionType(string name, FunctionDeclaration node, RuntimeType owner = null) {
         if (string.IsNullOrWhiteSpace(name))
             name = GenerateUniqueTypeId(RTVT.Function);
 
         var rtType = new RuntimeTypeInfo_Function {
-            Name  = name,
-            Index = index,
-            Owner = owner
+            Name       = name,
+            Owner      = owner,
+            LinkedNode = node
+        };
+        RegisterType(rtType);
+        return rtType;
+    }
+    public RuntimeTypeInfo_Signal RegisterSignalType(string name, SignalDeclarationNode node, RuntimeType owner = null) {
+        if (string.IsNullOrWhiteSpace(name))
+            name = GenerateUniqueTypeId(RTVT.Signal);
+
+        var rtType = new RuntimeTypeInfo_Signal {
+            Name       = name,
+            Owner      = owner,
+            LinkedNode = node
         };
         RegisterType(rtType);
         return rtType;
     }
 
 
-    private void RegisterType(RuntimeTypeInfo rtType) {
-        if (Types.TryAdd(rtType.Name, rtType)) {
-            rtType.Table = this;
+    public void RegisterType(RuntimeType rtType, params string[] aliases) {
+        if (rtType == null)
+            throw new ArgumentNullException(nameof(rtType));
 
-            TypesByType.GetOrAdd(rtType.Type).Add(rtType);
-            return;
+        if (!TypesByName.TryAdd(rtType.Name, rtType))
+            throw new DeclarationException($"Type {rtType.Name} is already registered", TypesByName[rtType.Name]);
+
+        if (aliases != null) {
+            foreach (var alias in aliases) {
+                if (!TypeAliases.TryAdd(alias, rtType))
+                    throw new DeclarationException($"Type alias {alias} is already registered", TypeAliases[alias]);
+            }
         }
 
-        throw new Exception($"Type {rtType.Name} is already registered");
+        TypesByType.GetOrAdd(rtType.Type).Add(rtType);
+        TypesByNativeType.GetOrAdd(rtType.GetType()).Add(rtType);
+        if (rtType.ValueType != null)
+            TypesByValueType.GetOrAdd(rtType.ValueType).Add(rtType);
+
+        TypesByRuntimeType.GetOrAdd(rtType.RuntimeValueType).Add(rtType);
+
+        Types.Add(rtType);
+
     }
 
-    public RuntimeTypeInfo FromValueType(object value) {
+    public RuntimeType FromValueType(object value) {
         if (value == null)
             return StaticTypes.Null;
 
-        RuntimeTypeInfo resultType = value switch {
-            RuntimeValue rtValue => rtValue.RuntimeType,
-            RuntimeTypeInfo info => info,
+        var resultType = value switch {
+            BaseValue rtValue => rtValue.RuntimeType,
+            RuntimeType info  => info,
 
-            Type ty when TypesByValueType.TryGetValue(ty, out var tType)  => tType,
-            Type ty when TypesByNativeType.TryGetValue(ty, out var tType) => tType,
+            Type ty when TypesByValueType.TryGetValue(ty, out var tType)   => tType.First(),
+            Type ty when TypesByNativeType.TryGetValue(ty, out var tType)  => tType.First(),
+            Type ty when TypesByRuntimeType.TryGetValue(ty, out var tType) => tType.First(),
 
             // Type ty when StaticTypes.TypesByValueType.TryGetValue(ty, out var tType) => tType, 
 
@@ -203,11 +229,8 @@ public class TypeTable : IDisposable
         if (resultType != null)
             return resultType;
 
-        // if (value is Type ty && TypesByValueType.TryGetValue(ty, out var tType))
-        // return tType;
-
         if (TypesByValueType.TryGetValue(value.GetType(), out var rtType))
-            return rtType;
+            return rtType.First();
 
         if (Parent?.FromValueType(value) is { } parentType)
             return parentType;
@@ -215,13 +238,8 @@ public class TypeTable : IDisposable
         return Get(value.GetType());
     }
 
-    public static RuntimeTypeInfo GetFromValueType(object value) {
-        return GlobalTypeTable.FromValueType(value);
-    }
-
-
-    public static bool AreSameRtType(RuntimeTypeInfo a, RuntimeTypeInfo b) => a.Type == b.Type;
-    public static bool AreSameRtType(RuntimeTypeInfo a, object          b) => a.Type == GetFromValueType(b).Type;
+    public static bool AreSameRtType(RuntimeType a, RuntimeType b) => a.Type == b.Type;
+    public static bool AreSameRtType(RuntimeType a, object      b) => a.Type == GetFromValueType(b).Type;
 
     public void Dispose() { }
 }

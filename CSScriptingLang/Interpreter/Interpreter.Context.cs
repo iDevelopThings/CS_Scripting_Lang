@@ -1,10 +1,16 @@
-﻿using CSScriptingLang.Core.FileSystem;
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using CSScriptingLang.Interpreter.Context;
+using CSScriptingLang.Interpreter.Coroutines;
 using CSScriptingLang.Interpreter.Modules;
+using CSScriptingLang.Lexing;
 using CSScriptingLang.Parsing.AST;
-using CSScriptingLang.RuntimeValues;
 using CSScriptingLang.Utils;
 using CSScriptingLang.RuntimeValues.Types;
+using CSScriptingLang.RuntimeValues.Values;
 using Engine.Engine.Logging;
+using SharpX;
+using SharpX.Extensions;
 
 namespace CSScriptingLang.Interpreter;
 
@@ -151,57 +157,6 @@ public class ValueStackContainer
     }
 }
 
-public class FunctionExecutionFrame : IDisposable
-{
-    private BaseNode _functionDeclaration;
-
-    public BaseNode FunctionDeclaration {
-        get => _functionDeclaration;
-        set {
-            if (value is InlineFunctionDeclarationNode inlineFunctionDeclaration) {
-                InlineFn = inlineFunctionDeclaration;
-            }
-
-            if (value is FunctionDeclarationNode functionDeclaration) {
-                Fn = functionDeclaration;
-            }
-
-            _functionDeclaration = value;
-        }
-    }
-
-    public InlineFunctionDeclarationNode InlineFn { get; set; } = null;
-    public FunctionDeclarationNode       Fn       { get; set; } = null;
-
-    public string Name => Fn?.Name ?? InlineFn?.ToString();
-
-    public List<Symbol> Args   { get; set; } = new();
-    public Symbol       Object { get; set; } = null;
-
-    public InterpreterExecutionContext Context { get; set; } = null;
-
-    public BlockNode CurrentBlock { get; set; } = null;
-
-    public BlockNode ReturnBlock { get; set; } = null;
-    public bool      HasReturned { get; set; } = false;
-
-    private RuntimeValue _returnValue = null;
-    public RuntimeValue ReturnValue {
-        get => _returnValue;
-        set {
-            ReturnBlock  = CurrentBlock;
-            HasReturned  = true;
-            _returnValue = value;
-        }
-    }
-
-    public List<DeferStatementNode> DeferStatements { get; set; } = new();
-
-    public void Dispose() {
-        Context.Interpreter.PopFunctionFrame(true);
-    }
-}
-
 public struct ExecResult
 {
     private Interpreter interpreter;
@@ -209,6 +164,13 @@ public struct ExecResult
     public bool DidSetValue { get; set; }
 
     public int ValuesPushed { get; set; }
+
+    private ValueReference[] _references { get; set; }
+    public ValueReference[] References {
+        get => _references ??= [];
+        set => _references = value;
+    }
+
 
     private List<object> _values { get; set; }
     public List<object> Values {
@@ -237,6 +199,51 @@ public struct ExecResult
         }
     }
 
+    public T Get<T>() {
+        return TryGet<T>(out var value) ? value : default;
+    }
+    public T Get<T>(Func<T, bool> predicate) {
+        foreach (var value in Values) {
+            if (value is T typedValue && predicate(typedValue)) {
+                return typedValue;
+            }
+        }
+        return default;
+    }
+    public T Get<T>(int atIndex) {
+        var i = 0;
+        foreach (var value in Values) {
+            if (value is T typedValue) {
+                if (i == atIndex) {
+                    return typedValue;
+                }
+                i++;
+            }
+        }
+        return default;
+    }
+    public Value Get(RTVT type) {
+        foreach (var value in Values) {
+            if (value is Value typedValue && typedValue.Type == type) {
+                return typedValue;
+            }
+        }
+        return null;
+    }
+    public (T1, T2) Get<T1, T2>() {
+        return (Get<T1>(), Get<T2>());
+    }
+    public bool TryGetLast<T>(out T value) {
+        if (Values.Count > 0) {
+            var val = Values.OfType<T>().LastOrDefault();
+            if (val != null) {
+                value = val;
+                return true;
+            }
+        }
+        value = default;
+        return false;
+    }
     public bool TryGet<T>(out T value) {
         foreach (var val in Values) {
             if (val is T typedValue) {
@@ -244,7 +251,6 @@ public struct ExecResult
                 return true;
             }
         }
-
         value = default;
 
         return false;
@@ -253,14 +259,26 @@ public struct ExecResult
         a.Values.Add(b);
         return a;
     }
+    public static ExecResult operator +(ExecResult a, ValueReference b) {
+        a.Values.Add(b.Value);
+        return a;
+    }
+    public static ExecResult operator +(ExecResult a, IEnumerable<Value> b) {
+        a.Values.AddRange(b);
+        return a;
+    }
+    public static ExecResult operator +(ExecResult a, (VariableSymbol, Value) b) {
+        a.Values.Add(b.Item1);
+        a.Values.Add(b.Item2);
+        return a;
+    }
 
-    public bool TryPopSymbolOrRTValue(out RuntimeValue value) {
-        if (ValuesPushed > 0) {
-            return interpreter.TryPopSymbolOrRTValue(out value);
-        }
-
-        value = null;
-        return false;
+    public ExecResult Add(ExecResult b) {
+        ValuesPushed += b.ValuesPushed;
+        DidSetValue  |= b.DidSetValue;
+        if (b._values != null)
+            Values.AddRange(b.Values);
+        return this;
     }
 
     public static ExecResult operator +(ExecResult a, ExecResult b) {
@@ -270,207 +288,145 @@ public struct ExecResult
             a.Values.AddRange(b.Values);
         return a;
     }
+
+    public bool HasValues() {
+        return Values.Count > 0 || ValuesPushed > 0;
+    }
+
+    public bool TryGet(out (VariableSymbol, Value) value) {
+        VariableSymbol symbol;
+        Value          rtValue;
+
+        if (!TryGet(out rtValue)) { }
+
+        if (TryGet(out symbol)) {
+            if (rtValue == null) {
+                rtValue = symbol.Val;
+            }
+        }
+
+        if (rtValue == null && symbol == null) {
+            value = (null, null);
+            return false;
+        }
+
+        value = (symbol, rtValue);
+
+        return true;
+    }
+
+    public IEnumerable<T> PopValues<T>() {
+        foreach (var value in Values) {
+            if (value is T typedValue) {
+                yield return typedValue;
+            }
+        }
+    }
+
+    public IEnumerable<object> GetValues() {
+        foreach (var value in Values) {
+            yield return value;
+        }
+    }
+
+    public static explicit operator Value(ExecResult result) {
+        if (result.TryGet(out Value value)) {
+            return value;
+        }
+
+        return null;
+    }
+
+    public static explicit operator VariableSymbol(ExecResult result) {
+        if (result.TryGet(out VariableSymbol value)) {
+            return value;
+        }
+
+        return null;
+    }
+
+    public static explicit operator (VariableSymbol, Value)(ExecResult result) {
+        if (result.TryGet(out (VariableSymbol, Value) value)) {
+            return value;
+        }
+
+        return (null, null);
+    }
+    public ExecResult AddReference(ValueReference reference) {
+        References = References.Append(reference).ToArray();
+        return this;
+    }
+
+    public bool TryGetReference(out ValueReference reference) {
+        if (References.Length > 0) {
+            reference = References[^1];
+            return true;
+        }
+
+        reference = default;
+        return false;
+    }
+    public ref ValueReference GetReference(int index) => ref References[index];
+    public ref ValueReference GetLastReference()      => ref References[^1];
+    public ref ValueReference GetFirstReference()     => ref References[0];
+
+
 }
 
 public partial class Interpreter
 {
-    private Logger Logger = Logs.Get<Interpreter>();
+    public static Logger Logger = Logs.Get<Interpreter>(LogLevel.Debug);
 
-    private bool logPushPopEnabled = false;
+    private static ClassScopedTimerInst<Interpreter> Timer = ClassScopedTimerInst<Interpreter>.Create(Logger)
+       .SetColorFn(n => n.BoldBrightBlue())
+       .SetName("Interpreter");
 
-    public FileSystem FileSystem { get; set; }
+    public TypeTable             TypeTable  => TypeTable.Current;
+    public InterpreterFileSystem FileSystem { get; set; }
 
-    public Stack<InterpreterExecutionContext> ContextStack = new();
+    public ModuleResolver ModuleResolver { get; set; }
 
-    public Stack<FunctionExecutionFrame> CallStack = new();
-    public FunctionExecutionFrame        CurrentFrame => CallStack.TryPeek(out var frame) ? frame : null;
+    public Module Module { get; set; }
 
-    public InterpreterExecutionContext Context => ContextStack.Peek();
+    public Scheduler Scheduler { get; set; }
 
-    public SymbolTable Symbols   => Context.SymbolTable;
-    public TypeTable   TypeTable => Context.TypeTable;
-
-    public ModuleRegistry ModuleRegistry => Context.ModuleRegistry;
-    public Module Module {
-        get => Context.Module;
-        set => Context.Module = value;
-    }
-
-    public ScopedValueStack ValueStack = new();
-
-    public InterpreterExecutionContext PushFrame(object contextObject = null, bool isRoot = false) {
-        var ctx = InterpreterExecutionContext.Create(this, isRoot);
-        ctx.ContextObject = contextObject;
-        ContextStack.Push(ctx);
-
-        InterpreterEvents.OnExecutionScopePushed?.Invoke(ctx);
-
-        return ctx;
-    }
-
-    public InterpreterExecutionContext PopFrame() {
-        if (ContextStack.Count == 0) {
-            Logger.Error($"Attempted to pop symbol frame when there are no more frames to pop");
-            return null;
-        }
-
-        return Context.Pop();
-    }
-
-    public FunctionExecutionFrame PushFunctionFrame(InlineFunctionDeclarationNode declaration, Symbol objectSymbol = null) {
-        var frame = new FunctionExecutionFrame {
-            FunctionDeclaration = declaration,
-            Object              = objectSymbol,
-            Context             = Context,
-            CurrentBlock        = declaration.Body
-        };
-
-        CallStack.Push(frame);
-
-        InterpreterEvents.OnFunctionFramePushed?.Invoke(frame);
-
-        return frame;
-    }
-
-    public FunctionExecutionFrame PopFunctionFrame(bool isFromDispose = false) {
-        if (!CallStack.TryPeek(out var frame)) {
-            Logger.Error($"Attempted to pop function frame when there are no more frames to pop");
-            return null;
-        }
-
-        if (frame.DeferStatements.Count > 0) {
-            foreach (var defer in frame.DeferStatements) {
-                Context.Interpreter.Execute(defer);
-            }
-        }
-
-        InterpreterEvents.OnFunctionFramePopped?.Invoke(frame);
-
-        CallStack.Pop();
-
-        return frame;
-    }
-
-    private void LogPushPop(Caller caller, string prefixStr, object value = null) {
-        if (!logPushPopEnabled)
-            return;
-
-        var valueTypeName = "";
-        var stringValue   = "";
-        if (value != null) {
-            valueTypeName = value.GetType().Name.Split(".").Last();
-            stringValue   = value.ToString();
-        }
-
-        Logger.Debug($"{prefixStr} '{stringValue}' -> '{valueTypeName}' from {caller}");
-    }
-
-    public UsingCallbackHandle PushValue(object value) {
-        LogPushPop(Caller.GetFromFrame(2), "Pushing", value);
-
-        ValueStack.Push(value);
-
-        return new UsingCallbackHandle(() => {
-            if (ValueStack.TryPeek(out var peeked) && peeked.Equals(value)) {
-                ValueStack.Pop();
-                LogPushPop(Caller.GetFromFrame(3), "Popping", value);
-            } else {
-                LogPushPop(Caller.GetFromFrame(3), "Already popped", value);
-            }
-        }, value);
-        // return ValueStack.Using(value);
-    }
-
-    public object PopValue(int frameOffset = 2) {
-        var popped = ValueStack.Pop();
-        LogPushPop(Caller.GetFromFrame(frameOffset), "Popping", popped);
-        return popped;
-    }
-
-    public T PopValue<T>() => (T) PopValue(3);
-
-    public bool TryPopValue<T>(out T value, bool throwOnFail = true) {
-        if (ValueStack.TryPeek(out var peeked) && peeked is T typedValue) {
-            ValueStack.Pop();
-
-            value = typedValue;
-
-            LogPushPop(Caller.GetFromFrame(2), "Popping", value);
-
-            return true;
-        }
-
-        if (!throwOnFail) {
-            value = default;
-            return false;
-        }
-
-        throw new Exception("Value is not of type T");
-    }
-
-    public bool TryPopSymbolAndRTValue(out RuntimeValue value, out Symbol symbol) {
-        if (ValueStack.TryPeek(out var peeked)) {
-            if (peeked is RuntimeValue rtValue) {
-                ValueStack.Pop();
-                LogPushPop(Caller.GetFromFrame(2), "Popping", rtValue);
-                value  = rtValue;
-                symbol = rtValue.Symbol;
-                return true;
-            }
-
-            if (peeked is Symbol sym) {
-                ValueStack.Pop();
-                LogPushPop(Caller.GetFromFrame(2), "Popping", sym);
-                value  = sym.Value;
-                symbol = sym;
-                return true;
-            }
-        }
-
-        value  = null;
-        symbol = null;
-
-        return false;
-    }
-    public bool TryPopSymbolOrRTValue(out RuntimeValue value) {
-        if (ValueStack.TryPeek(out var peeked)) {
-            if (peeked is RuntimeValue rtValue) {
-                ValueStack.Pop();
-                LogPushPop(Caller.GetFromFrame(2), "Popping", rtValue);
-                value = rtValue;
-                return true;
-            }
-
-            if (peeked is Symbol symbol) {
-                ValueStack.Pop();
-                LogPushPop(Caller.GetFromFrame(2), "Popping", symbol);
-                value = symbol.Value;
-                return true;
-            }
-        }
-
-        value = null;
-        return false;
-    }
-
+    [DebuggerStepThrough]
     public ExecResult NewResult() => new(this);
 
-    /*public UsingCallbackHandle PushValue<T>(T value) {
-        if (value is RuntimeValue runtimeValue) {
-            return PushValue(runtimeValue);
-        }
-
-        LogPushPop(Caller.GetFromFrame(2), true, value);
-
-        return ValueStackContainer.Using(value);
+    [DebuggerStepThrough]
+    private ExecResult NewResult(ValueReference value) {
+        var r = NewResult();
+        r += value;
+        return r;
     }
-    public T PopValue<T>() {
-        if (typeof(T) == typeof(RuntimeValue)) {
-            return (T) (object) PopValue();
+    
+    [DebuggerStepThrough]
+    private ExecResult NewResult(Maybe<ValueReference> value) {
+        if(value.MatchJust(out var reference)) {
+            return NewResult(reference);
         }
+        return NewResult();
+    }
+    
+    [DebuggerStepThrough]
+    private ExecResult NewResult(IEnumerable<Maybe<ValueReference>> value) {
+        var result = NewResult();
+        value.ForEach(v => {
+            if (v.MatchJust(out var reference)) {
+                result += reference;
+            }
+        });
+        return result;
+    }
 
-        var popped = ValueStackContainer.Pop<T>();
-        LogPushPop(Caller.GetFromFrame(2), false, popped);
-        return popped;
-    }*/
+
+    private void LogError(BaseNode node, string message, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string member = "") {
+        ErrorWriter.Configure(node?.GetScript(), file, line, member);
+
+        throw new FatalInterpreterException(message, node)
+           .WithCaller(Caller.FromAttributes(file, line, member));
+    }
+    private void LogWarning(BaseNode node, string message, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string member = "") {
+        ErrorWriter.Create(node, file, line, member).LogWarning(message, node);
+    }
 }

@@ -14,7 +14,7 @@ namespace CSScriptingLangGenerators;
 public class InterpreterSourceGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context) {
-        return;
+        /*return;
         
         var provider = context.SyntaxProvider.CreateSyntaxProvider(
             (s,   _) => IsCandidateClass(s),
@@ -25,7 +25,7 @@ public class InterpreterSourceGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(
             context.CompilationProvider.Combine(provider.Collect()),
             ((ctx, t) => ExecuteInterpreterGeneration(ctx, t.Left, t.Right!))
-        );
+        );*/
     }
     private bool IsCandidateClass(SyntaxNode syntaxNode) {
         if (syntaxNode is not ClassDeclarationSyntax classDeclaration)
@@ -59,7 +59,7 @@ public class InterpreterSourceGenerator : IIncrementalGenerator
         if (symbol.BaseType is null)
             return null;
 
-        if (symbol.ContainingNamespace.ToDisplayString() != "CSScriptingLang.Parsing.AST")
+        if (!symbol.ContainingNamespace.ToDisplayString().Contains(Constants.ASTNamespace))
             return null;
 
         return classDeclaration;

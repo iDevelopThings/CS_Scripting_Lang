@@ -5,73 +5,51 @@ public enum TokenType : long
 {
     None = 0,
 
-    Identifier = 1 << 0,
-    Keyword    = 1 << 1,
+    Identifier = 1L << 0,
+    Keyword    = 1L << 1,
 
-    Int32  = 1 << 2,
-    Int64  = 1 << 3,
-    Float  = 1 << 4,
-    Double = 1 << 5,
+    Int32  = 1L << 2,
+    Int64  = 1L << 3,
+    Float  = 1L << 4,
+    Double = 1L << 5,
     // Number  = Int32 | Int64 | Float | Double,
 
-    Boolean = 1 << 6,
-    String  = 1 << 7,
+    Boolean = 1L << 6,
+    String  = 1L << 7,
 
-    LParen   = 1 << 8,
-    RParen   = 1 << 9,
-    LBrace   = 1 << 10,
-    RBrace   = 1 << 11,
-    LBracket = 1 << 12,
-    RBracket = 1 << 13,
+    LParen   = 1L << 8,  // (
+    RParen   = 1L << 9,  // )
+    LBrace   = 1L << 10, // {
+    RBrace   = 1L << 11, // }
+    LBracket = 1L << 12, // [
+    RBracket = 1L << 13, // ]
+    LAngle   = 1L << 14, // <
+    RAngle   = 1L << 15, // >
 
-    Dot       = 1 << 14,
-    Semicolon = 1 << 15,
-    Comma     = 1 << 16,
-    Colon     = 1 << 17,
+    Arrow      = 1L << 16, // =>
+    Dot        = 1L << 17, // .
+    DotDotDot  = 1L << 18, // ...
+    Semicolon  = 1L << 19, // ;
+    Comma      = 1L << 20, // ,
+    Colon      = 1L << 21, // :
+    And        = 1L << 22, // &
+    At         = 1L << 23, // @
+    Underscore = 1L << 24, // _
+    Question   = 1L << 26, // ?
+    Tilde      = 1L << 41, // ~
+    Hash       = 1L << 42, // #
+    Dollar     = 1L << 43, // $
+    Backslash  = 1L << 44, // \
 
-    LineComment  = 1 << 18,
-    BlockComment = 1 << 19,
 
-    Operator = 1 << 20, // Operator is a catch-all for all operators
+    LineComment  = 1L << 45, // //
+    BlockComment = 1L << 46, // /* */
 
-    [Keyword("import")]
-    Import = 1 << 21,
+    Operator = 1L << 47, // Operator is a catch-all for all operators
 
-    [Keyword("if")]
-    If = 1 << 22,
-
-    [Keyword("else")]
-    Else = 1 << 23,
-
-    [Keyword("while")]
-    While = 1 << 24,
-
-    [Keyword("for")]
-    For = 1 << 25,
-
-    [Keyword("function")]
-    Function = 1 << 26,
-
-    [Keyword("return")]
-    Return = 1 << 27,
-
-    [Keyword("var")]
-    Var = 1 << 28,
-
-    [Keyword("range")]
-    Range = 1 << 29,
-
-    [Keyword("defer")]
-    Defer = 1 << 30,
-
-    [Keyword("true")]
-    True = Boolean | Keyword,
-
-    [Keyword("false")]
-    False = Boolean | Keyword,
-
-    EOF   = 1 << 31,
-    Error = 1L << 32,
+    EOF   = 1L << 48,
+    Error = 1L << 49,
 
     KeywordIdentifier = Identifier | Keyword,
+
 }

@@ -32,7 +32,7 @@ public class Symbols_Test : BaseCompilerTest
             """
         );
 
-        var a = Symbols.Get("a");
+        var a = Variables.Get("a");
         
     }
 }

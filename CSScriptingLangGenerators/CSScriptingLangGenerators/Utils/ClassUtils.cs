@@ -22,6 +22,42 @@ public class ClassUtils
         return false;
     }
     
+    public static ClassDeclarationSyntax GetDeclarationFor(INamedTypeSymbol symbol, Compilation compilation) {
+        foreach (var syntaxTree in compilation.SyntaxTrees) {
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+
+            var classDeclarations = syntaxTree.GetRoot().DescendantNodes().OfType<ClassDeclarationSyntax>();
+
+            foreach (var classDeclaration in classDeclarations) {
+                if (semanticModel.GetDeclaredSymbol(classDeclaration) is INamedTypeSymbol classSymbol && SymbolEqualityComparer.Default.Equals(classSymbol, symbol)) {
+                    return classDeclaration;
+                }
+            }
+        }
+
+        return null;
+    }
+    
+    public static List<ClassDeclarationSyntax> GetDeclarationsFor(IEnumerable<INamedTypeSymbol> symbols, Compilation compilation) {
+        var declarations = new List<ClassDeclarationSyntax>();
+
+        foreach (var symbol in symbols) {
+            foreach (var syntaxTree in compilation.SyntaxTrees) {
+                var semanticModel = compilation.GetSemanticModel(syntaxTree);
+
+                var classDeclarations = syntaxTree.GetRoot().DescendantNodes().OfType<ClassDeclarationSyntax>();
+
+                foreach (var classDeclaration in classDeclarations) {
+                    if (semanticModel.GetDeclaredSymbol(classDeclaration) is INamedTypeSymbol classSymbol && SymbolEqualityComparer.Default.Equals(classSymbol, symbol)) {
+                        declarations.Add(classDeclaration);
+                    }
+                }
+            }
+        }
+
+        return declarations;
+    }
+    
     public static List<INamedTypeSymbol> GetDerivedTypes(
         Compilation      compilation,
         INamedTypeSymbol instructionBaseSymbol,

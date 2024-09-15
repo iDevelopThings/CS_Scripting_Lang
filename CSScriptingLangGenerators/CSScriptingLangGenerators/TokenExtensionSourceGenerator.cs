@@ -15,78 +15,72 @@ public class TokenExtensionSourceGenerator : IIncrementalGenerator
     private const string AttributeName = "ReportAttribute";
 
     public void Initialize(IncrementalGeneratorInitializationContext context) {
-
-
-        // Filter classes annotated with the [Report] attribute. Only filtered Syntax Nodes can trigger code generation.
         var provider = context.SyntaxProvider
                .CreateSyntaxProvider(
-                    (s,   _) => s is StructDeclarationSyntax && IsValidTokenStruct(s),
+                    (s, _) => {
+                        if (s is not ClassDeclarationSyntax classDeclarationSyntax)
+                            return false;
+
+                        if (classDeclarationSyntax.Identifier.Text != "Token")
+                            return false;
+
+                        return true;
+                    },
                     (ctx, _) => GetClassDeclarationForSourceGen(ctx)
                 )
             ;
 
-
-        // Generate the source code.
         context.RegisterSourceOutput(
             context.CompilationProvider.Combine(provider.Collect()),
             ((ctx, t) => GenerateCode(ctx, t.Left, t.Right!))
         );
     }
 
-    private static bool IsValidTokenStruct(SyntaxNode node) {
-        if (node is not StructDeclarationSyntax structDeclarationSyntax)
-            return false;
-
-        if (structDeclarationSyntax.Identifier.Text != "Token")
-            return false;
-
-        return true;
-    }
-
-    private static StructDeclarationSyntax GetClassDeclarationForSourceGen(
-        GeneratorSyntaxContext context
-    ) {
-        var structDeclarationSyntax = (StructDeclarationSyntax) context.Node;
-        if (context.SemanticModel.GetDeclaredSymbol(structDeclarationSyntax) is not INamedTypeSymbol structSymbol)
+    private static ClassDeclarationSyntax GetClassDeclarationForSourceGen(GeneratorSyntaxContext context) {
+        var decl = (ClassDeclarationSyntax) context.Node;
+        if (context.SemanticModel.GetDeclaredSymbol(decl) is not INamedTypeSymbol structSymbol)
             return null;
 
-        // Only allow the struct `CSScriptingLang.Lexing.Token`
         if (structSymbol.ContainingNamespace.ToDisplayString() != "CSScriptingLang.Lexing")
             return null;
         if (structSymbol.Name != "Token")
             return null;
 
-        return structDeclarationSyntax;
+        return decl;
     }
 
     private void GenerateCode(
-        SourceProductionContext                 context,
-        Compilation                             compilation,
-        ImmutableArray<StructDeclarationSyntax> declarations
+        SourceProductionContext                context,
+        Compilation                            compilation,
+        ImmutableArray<ClassDeclarationSyntax> declarations
     ) {
         var tokenTypeEnumSymbol = compilation.GetTypeByMetadataName("CSScriptingLang.Lexing.TokenType");
         if (tokenTypeEnumSymbol == null)
             return;
+        var keywordTypeEnumSymbol = compilation.GetTypeByMetadataName("CSScriptingLang.Lexing.Keyword");
+        if (keywordTypeEnumSymbol == null)
+            return;
+        var operatorTypeEnumSymbol = compilation.GetTypeByMetadataName("CSScriptingLang.Lexing.OperatorType");
+        if (operatorTypeEnumSymbol == null)
+            return;
 
+        foreach (var decl in declarations) {
+            var semanticModel = compilation.GetSemanticModel(decl.SyntaxTree);
 
-        foreach (var structDeclarationSyntax in declarations) {
-            var semanticModel = compilation.GetSemanticModel(structDeclarationSyntax.SyntaxTree);
-
-            // Symbols allow us to get the compile-time information.
-            if (semanticModel.GetDeclaredSymbol(structDeclarationSyntax) is not INamedTypeSymbol structSymbol)
+            if (semanticModel.GetDeclaredSymbol(decl) is not INamedTypeSymbol structSymbol)
                 continue;
 
             var tokenTypeMethods = tokenTypeEnumSymbol.GetMembers()
                .OfType<IFieldSymbol>()
-                // Skip fields which have the `KeywordAttribute` attribute.
-               .Where(m => m.GetAttributes().All(a => a.AttributeClass?.Name != "KeywordAttribute"))
                .Select(m => $@"    public bool Is{m.Name} => Type.HasAny(TokenType.{m.Name});");
 
-            var hasKeywordMethods = tokenTypeEnumSymbol.GetMembers()
+            var keywordTypeMethods = keywordTypeEnumSymbol.GetMembers()
                .OfType<IFieldSymbol>()
-                // Only include fields which have the `KeywordAttribute` attribute.
-               .Where(m => m.GetAttributes().Any(a => a.AttributeClass?.Name == "KeywordAttribute"))
-               .Select(m => $@"    public bool Is{m.Name}Keyword => Type.HasAny(TokenType.{m.Name});");
+               .Select(m => $@"    public bool Is{m.Name}Keyword => Keyword.HasAny(Keyword.{m.Name});");
+
+            var operatorTypeMethods = operatorTypeEnumSymbol.GetMembers()
+               .OfType<IFieldSymbol>()
+               .Select(m => $@"    public bool Is{m.Name}Operator => IsOperator && Op == OperatorType.{m.Name};");
 
             // Build up the source code
             var code = $@"// <auto-generated/>
@@ -97,12 +91,14 @@ using CSScriptingLang.Utils;
 
 namespace {structSymbol.ContainingNamespace.ToDisplayString()};
 
-public partial struct {structDeclarationSyntax.Identifier.Text}
+public partial class {decl.Identifier.Text}
 {{
 
 {string.Join("\n", tokenTypeMethods)}
 
-{string.Join("\n", hasKeywordMethods)}
+{string.Join("\n", keywordTypeMethods)}
+
+{string.Join("\n", operatorTypeMethods)}
 
     public bool Is(TokenType type, bool exact = false) => exact ? Type.HasAll(type) : Type.HasAny(type);
     
@@ -110,8 +106,7 @@ public partial struct {structDeclarationSyntax.Identifier.Text}
 }}
 ";
 
-            // Add the source code to the compilation.
-            context.AddSource($"{structDeclarationSyntax.Identifier.Text}.g.cs", SourceText.From(code, Encoding.UTF8));
+            context.AddSource($"{decl.Identifier.Text}.g.cs", SourceText.From(code, Encoding.UTF8));
         }
     }
 }

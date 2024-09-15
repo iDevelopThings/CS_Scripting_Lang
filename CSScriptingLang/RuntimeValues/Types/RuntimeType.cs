@@ -1,53 +1,54 @@
-﻿using CSScriptingLang.Utils;
+﻿using CSScriptingLang.Parsing.AST;
+using CSScriptingLang.RuntimeValues.Values;
 
 namespace CSScriptingLang.RuntimeValues.Types;
 
-public abstract class RuntimeTypeInfo
+public abstract partial class RuntimeType
 {
-    public TypeTable Table { get; set; }
+    /// <summary>
+    /// Whether the type is a primitive type or not(like `int`, `string`, `bool`, etc)
+    /// </summary>
+    public bool IsPrimitive { get; set; }
 
-    public          bool         IsPrimitive { get; set; }
-    public          RTVT         Type        { get; set; }
-    public          string       Name        { get; set; }
-    public          Type         ValueType   { get; set; }
-    public abstract RuntimeValue Constructor(params object[] args);
-    public abstract object       ZeroValue { get; }
+    /// <summary>
+    /// Enum value of the type, for ex `RTVT.String`
+    /// </summary>
+    public RTVT Type { get; set; }
 
+    /// <summary>
+    /// The name of the type, for ex `string`
+    /// </summary>
+    public string Name { get; set; }
+
+    /// <summary>
+    /// The type of the native/c# type, for ex `typeof(string)`
+    /// </summary>
+    public Type ValueType { get; set; }
+
+    /// <summary>
+    /// C# type of the value type, for ex,
+    /// - Object is `typeof(Object)`
+    /// - Array is `typeof(Array)`
+    /// </summary>
+    public abstract Type RuntimeValueType { get; }
+
+    /// <summary>
+    /// C# "zero" value of the type, for ex,
+    /// - Object is new dict,
+    /// - Array is new list
+    /// </summary>
+    public abstract object ZeroValue { get; }
+
+    public BaseNode           LinkedNode         { get; set; }
+    public DeclarationContext DeclarationContext => LinkedNode is ITopLevelDeclarationNode node ? node.DeclarationContext : null;
 
     // Takes any value and converts it to the correct corresponding type
     public virtual object ConvertToNative(object value) {
         throw new NotImplementedException();
     }
-
-    public static RuntimeValue TemporaryFrom<T>(T value) where T : RuntimeValue, new() {
-        var rtValue = ObjectPool<T>.Rent();
-        rtValue.Set(value.RuntimeType.ZeroValue, value.RuntimeType);
-        return rtValue;
-    }
 }
 
-public abstract class RuntimeTypeInfo<TRuntimeType, TNativeType, TRuntimeValueType> : RuntimeTypeInfo
-    where TRuntimeType : RuntimeTypeInfo<TRuntimeType, TNativeType, TRuntimeValueType>, new()
-    where TRuntimeValueType : RuntimeValue, new()
-{
-    public override object ConvertToNative(object value) => (TNativeType) value;
-
-    public override TRuntimeValueType Constructor(params object[] args) {
-        var rtValue = ObjectPool<TRuntimeValueType>.Rent();
-        rtValue.Set(args.Length > 0 ? args[0] : ZeroValue, this);
-        rtValue.OnConstruct(args.Skip(1).ToArray());
-
-        return rtValue;
-    }
-
-    public static TRuntimeValueType Temporary(TNativeType value) {
-        var rtValue = ObjectPool<TRuntimeValueType>.Rent();
-        rtValue.Set(value, StaticTypes.TypesByValueType[typeof(TNativeType)]);
-        return rtValue;
-    }
-}
-
-public class RuntimeTypeInfo_String : RuntimeTypeInfo<RuntimeTypeInfo_String, string, RuntimeValue>
+public class RuntimeTypeInfo_String : RuntimeType
 {
     public RuntimeTypeInfo_String() {
         IsPrimitive = true;
@@ -55,13 +56,13 @@ public class RuntimeTypeInfo_String : RuntimeTypeInfo<RuntimeTypeInfo_String, st
         Name        = "String";
         ValueType   = typeof(string);
     }
+    public override Type RuntimeValueType => typeof(ValueString);
 
-    public override object ZeroValue => "";
-
+    public override object ZeroValue                     => "";
     public override object ConvertToNative(object value) => Convert.ToString(value);
 }
 
-public class RuntimeTypeInfo_Boolean : RuntimeTypeInfo<RuntimeTypeInfo_Boolean, bool, RuntimeValue>
+public class RuntimeTypeInfo_Boolean : RuntimeType
 {
     public RuntimeTypeInfo_Boolean() {
         IsPrimitive = true;
@@ -69,13 +70,14 @@ public class RuntimeTypeInfo_Boolean : RuntimeTypeInfo<RuntimeTypeInfo_Boolean, 
         Name        = "Boolean";
         ValueType   = typeof(bool);
     }
+    public override Type RuntimeValueType => typeof(ValueBoolean);
 
     public override object ZeroValue => false;
 
     public override object ConvertToNative(object value) => Convert.ToBoolean(value);
 }
 
-public class RuntimeTypeInfo_Null : RuntimeTypeInfo
+public class RuntimeTypeInfo_Null : RuntimeType
 {
     public RuntimeTypeInfo_Null() {
         IsPrimitive = true;
@@ -84,75 +86,120 @@ public class RuntimeTypeInfo_Null : RuntimeTypeInfo
         ValueType   = null;
     }
 
-    public override RuntimeValue Constructor(params object[] args) => new(this, ZeroValue);
-    public override object       ZeroValue                         => null;
+    public override object ZeroValue        => null;
+    public override Type   RuntimeValueType => typeof(ValueNull);
 
     public override object ConvertToNative(object value) => null;
 }
 
-public class RuntimeTypeInfo_Object : RuntimeTypeInfo<RuntimeTypeInfo_Object, Dictionary<string, RuntimeValue>, RuntimeValue_Object>
+public class RuntimeTypeInfo_Object : RuntimeType
 {
-    public RuntimeTypeInfo Owner { get; set; }
-
-    public Dictionary<string, RuntimeTypeInfo> Fields { get; } = new();
+    public RuntimeType Owner { get; set; }
 
     public RuntimeTypeInfo_Object() {
-        ValueType = typeof(Dictionary<string, RuntimeValue>);
+        ValueType = typeof(Dictionary<string, BaseValue>);
         Type      = RTVT.Object;
         Name      = "Object";
     }
 
-    public RuntimeTypeInfo RegisterField(string name, RuntimeTypeInfo rtType) {
-        Fields.TryAdd(name, rtType);
+    // public new RuntimeValue_Object Constructor(params object[] args)
+    // => base.Constructor(args) as RuntimeValue_Object;
 
-        return rtType;
+    public override Type   RuntimeValueType => typeof(ValueObject);
+    public override object ZeroValue        => new Dictionary<string, BaseValue>();
+
+    private string _fqn;
+    public string FQN {
+        get => string.IsNullOrEmpty(_fqn) ? Name : _fqn;
+        set => _fqn = value;
     }
-    public RuntimeTypeInfo RegisterField(string name, RTVT type) {
-        var rtType = Table.Get(type);
-        if (rtType == null) {
-            throw new Exception($"Type {type} not found");
-        }
-
-        return RegisterField(name, rtType);
-    }
-
-    public override object ZeroValue => new Dictionary<string, RuntimeValue>();
 
     public override object ConvertToNative(object value) => value;
 }
 
-public class RuntimeTypeInfo_Array : RuntimeTypeInfo<RuntimeTypeInfo_Array, List<RuntimeValue>, RuntimeValue_Array>
+public class RuntimeTypeInfo_Signal : RuntimeTypeInfo_Object
 {
-    public RuntimeTypeInfo_Array() {
-        ValueType = typeof(List<RuntimeValue>);
-        Type      = RTVT.Array;
-        Name      = "Array";
+    public RuntimeTypeInfo_Signal() {
+        ValueType = typeof(ValueSignal);
+        Type      = RTVT.Signal;
+        Name      = "Signal";
     }
-
-    public override object ZeroValue                     => new List<RuntimeValue>();
-    public override object ConvertToNative(object value) => value;
-}
-
-public class RuntimeTypeInfo_Function : RuntimeTypeInfo<RuntimeTypeInfo_Function, RuntimeValue_Function, RuntimeValue_Function>
-{
-    public int             Index { get; set; }
-    public RuntimeTypeInfo Owner { get; set; }
 
     public struct Parameter
     {
-        public string          Name;
-        public RuntimeTypeInfo Type;
+        public string      Name;
+        public RuntimeType Type;
+    }
+
+    public List<Parameter> Parameters { get; } = new();
+
+    public override object ZeroValue                     => new ValueSignal();
+    public override Type   RuntimeValueType              => typeof(ValueSignal);
+    public override object ConvertToNative(object value) => value;
+}
+
+public class RuntimeTypeInfo_Struct : RuntimeTypeInfo_Object
+{
+    public RuntimeTypeInfo_Struct() {
+        ValueType = typeof(ValueStruct);
+        Type      = RTVT.Struct;
+        Name      = "Struct";
+    }
+
+    public override object ZeroValue                     => null;
+    public override Type   RuntimeValueType              => typeof(ValueStruct);
+    public override object ConvertToNative(object value) => value;
+}
+
+public class RuntimeTypeInfo_Array : RuntimeType
+{
+    public RuntimeTypeInfo_Array() {
+        ValueType = typeof(List<BaseValue>);
+        Type      = RTVT.Array;
+        Name      = "Array";
+    }
+    public override Type RuntimeValueType => typeof(ValueArray);
+
+    public override object ZeroValue                     => new List<BaseValue>();
+    public override object ConvertToNative(object value) => value;
+}
+
+public class RuntimeTypeInfo_Function : RuntimeType
+{
+    public RuntimeType Owner { get; set; }
+
+    public struct Parameter
+    {
+        public string      Name;
+        public RuntimeType Type;
+        public bool        IsVariadic { get; set; }
     }
 
     public List<Parameter> Parameters { get; } = new();
 
     public RuntimeTypeInfo_Function() {
-        ValueType = typeof(RuntimeValue_Function);
+        ValueType = typeof(ValueFunction);
         Type      = RTVT.Function;
         Name      = "Function";
     }
+    public override Type RuntimeValueType => typeof(ValueFunction);
 
     public override object ZeroValue => StaticTypes.Null;
 
     public override object ConvertToNative(object value) => value;
+}
+
+public class RuntimeTypeInfo_Unit : RuntimeType
+{
+    public RuntimeTypeInfo_Unit() {
+        IsPrimitive = true;
+        Type        = RTVT.Unit;
+        Name        = "Unit";
+        ValueType   = null;
+    }
+
+    public override object ZeroValue        => null;
+    public override Type   RuntimeValueType => typeof(ValueUnit);
+
+    public override object ConvertToNative(object value) => null;
 }

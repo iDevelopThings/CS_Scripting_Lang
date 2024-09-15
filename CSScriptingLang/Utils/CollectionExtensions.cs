@@ -20,8 +20,18 @@ public static class DictionaryExtensions
         dictionary[key] = value;
         return value;
     }
-    
+
     public static List<T> GetOrAdd<TKey, T>(this Dictionary<TKey, List<T>> dictionary, TKey key) {
+        if (dictionary.TryGetValue(key, out var value)) {
+            return value;
+        }
+
+        value           = [];
+        dictionary[key] = value;
+        return value;
+    }
+
+    public static HashSet<T> GetOrAdd<TKey, T>(this Dictionary<TKey, HashSet<T>> dictionary, TKey key) {
         if (dictionary.TryGetValue(key, out var value)) {
             return value;
         }

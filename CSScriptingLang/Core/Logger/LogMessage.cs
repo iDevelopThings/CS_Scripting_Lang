@@ -1,4 +1,5 @@
-﻿using Alba.CsConsoleFormat;
+﻿using System.Runtime.CompilerServices;
+using Alba.CsConsoleFormat;
 using CSScriptingLang.Utils;
 
 namespace Engine.Engine.Logging;
@@ -12,38 +13,43 @@ public struct LogMessage : IEquatable<LogMessage>
     public List<object> Args = new();
     public DateTime     Timestamp;
 
-    public LogMessage(Logger logger, Caller caller, LogLevel severity, string source, string message) : this() {
+    public List<object> Context = new();
+
+    public static LogMessage Empty = new();
+
+    public bool IsEmpty => Logger == null;
+
+    public Logger Consumer { get; set; }
+    public bool   Consumed => Consumer != null;
+
+    public void Consume(Logger consumer = null) {
+        consumer ??= Consumer ?? Logger;
+        if (consumer != null) {
+            Consumer = consumer;
+        }
+    }
+
+    public LogMessage(Logger logger, Caller caller) : this() {
         Logger    = logger;
         Caller    = caller;
-        Severity  = severity;
-        Message   = new("[" + source + "]: " + message);
         Timestamp = DateTime.Now;
     }
 
-    public LogMessage(Logger logger, Caller caller, LogLevel severity, string message) : this() {
-        Logger    = logger;
-        Caller    = caller;
+    public LogMessage(Logger logger, Caller caller, LogLevel severity, string message) : this(logger, caller) {
         Severity  = severity;
         Message   = message;
         Timestamp = DateTime.Now;
     }
-    /*
-    public LogMessage(Logger logger, Caller caller, LogLevel severity, Span message) : this() {
-        Logger    = logger;
-        Caller    = caller;
-        Severity  = severity;
-        Message   = message;
-        Timestamp = DateTime.Now;
+
+    public LogMessage WithSeverity(LogLevel severity) {
+        Severity = severity;
+        return this;
     }
-    public LogMessage(Logger logger, Caller caller, LogLevel severity, ElementCollection message) : this() {
-        Logger    = logger;
-        Caller    = caller;
-        Severity  = severity;
-        ElCollection = message;
-        Timestamp = DateTime.Now;
+
+    public LogMessage WithMessage(string message) {
+        Message = message;
+        return this;
     }
-    public ElementCollection ElCollection { get; set; }
-*/
 
     public LogMessage WithArg(object arg) {
         Args.Add(arg);
@@ -69,4 +75,23 @@ public struct LogMessage : IEquatable<LogMessage>
 
     public static bool operator ==(LogMessage left, LogMessage right) => left.Equals(right);
     public static bool operator !=(LogMessage left, LogMessage right) => !(left == right);
+
+    public LogMessage WithContext(object context) {
+        Context.Add(context);
+        return this;
+    }
+    public bool HasContext<T>() {
+        return Context.Any(x => x is T);
+    }
+    public T GetContext<T>() {
+        return Context.OfType<T>().FirstOrDefault();
+    }
+    public bool GetContext<T>(out T context) {
+        context = Context.OfType<T>().FirstOrDefault();
+        return context != null;
+    }
+    
+    public void Log() {
+        Logger.Write(this);
+    }
 }

@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using CSScriptingLang.Common.Extensions;
 
 namespace CSScriptingLang.Utils;
 
@@ -123,7 +124,13 @@ public static class EnumExtensions
     }
 
     public static string GetFlagString<T>(this T value) where T : struct, Enum {
-        var flags = value.GetFlags().Select(f => f.ToString());
-        return string.Join(" | ", flags);
+        var allFlags = value.GetFlags().ToList();
+
+        // if `flag[0]` is a `None`/empty flag, remove it, if we have > 1 flags
+        if (allFlags.Count() > 1 && allFlags.First().Equals(default(T))) {
+            allFlags.RemoveAt(0);
+        }
+
+        return allFlags.Select(f => f.ToString()).Join(" | ");
     }
 }

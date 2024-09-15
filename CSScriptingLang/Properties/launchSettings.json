@@ -4,6 +4,21 @@
       "commandName": "Project",
       "workingDirectory": "$(SolutionDir)\\",
       "commandLineArgs": "testing.js"
+    },
+    "Execute Testing.js": {
+      "commandName": "Project",
+      "workingDirectory": "$(SolutionDir)\\",
+      "commandLineArgs": "run -p CSScriptingLang/TestingScripts -m testing"
+    },
+    "Execute(With Fn Debugging)": {
+      "commandName": "Project",
+      "workingDirectory": "$(SolutionDir)\\",
+      "commandLineArgs": "run -p CSScriptingLang/TestingScripts -m testing --debug:func --debug:funcs_exclude print"
+    },
+    "REPL": {
+      "commandName": "Project",
+      "workingDirectory": "$(SolutionDir)\\",
+      "commandLineArgs": "repl -p CSScriptingLang/TestingScripts -m testing"
     }
   }
 }

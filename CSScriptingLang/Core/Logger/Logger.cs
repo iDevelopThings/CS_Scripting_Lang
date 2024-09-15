@@ -1,16 +1,32 @@
-﻿using System.Text;
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Text;
 using Alba.CsConsoleFormat;
 using CSScriptingLang.Lexing;
 using CSScriptingLang.Utils;
 
 namespace Engine.Engine.Logging;
 
+[Flags]
+public enum LoggerFlags
+{
+    None        = 0,
+    NoTimestamp = 1 << 1,
+    NoSeverity  = 1 << 2,
+    NoName      = 1 << 3,
+    NoCaller    = 1 << 4,
+
+    All = NoTimestamp | NoSeverity | NoName | NoCaller
+}
+
+[DebuggerDisplay("{Name} - {LogLevel}")]
 public class Logger
 {
-    private Type     Type     { get; set; }
-    private string   Name     { get; set; }
-    private LogLevel LogLevel { get; set; }
-    
+    public  Type        Type     { get; set; }
+    private string      Name     { get; set; }
+    private LogLevel    LogLevel { get; set; }
+    public  LoggerFlags Flags    { get; set; } = LoggerFlags.None;
+
     public Func<string, string> ColorName { get; set; } = s => s.BrightGray();
 
     public Logger(string name, Type type, LogLevel logLevel = LogLevel.Debug) {
@@ -20,69 +36,97 @@ public class Logger
     }
 
     public string GetColoredName() => ColorName(Name);
-    public string GetName() => Name;
+    public string GetName()        => Name;
     public Logger SetName(string name) {
         Name = name;
         return this;
     }
 
-    private LogMessage ConstructMessage(LogLevel logLevel, Caller caller, string text, params object[] args) {
-        return new LogMessage(this, caller, logLevel, string.Format(text, args));
+    public Logger SetLogLevel(LogLevel logLevel) {
+        LogLevel = logLevel;
+        return this;
+    }
+    public LogLevel GetLogLevel() => LogLevel;
+
+    public Logger SetLogFlags(LoggerFlags flags) {
+        Flags = flags;
+        return this;
+    }
+    public Logger AddLogFlags(LoggerFlags flags) {
+        Flags |= flags;
+        return this;
+    }
+    public Logger RemoveLogFlags(LoggerFlags flags) {
+        Flags &= ~flags;
+        return this;
+    }
+    public bool HasLogFlag(LoggerFlags flags) => Flags.HasFlag(flags);
+
+    public void Write(LogMessage message) {
+        if (!CanLogMessage(message.Severity, message.Caller))
+            return;
+
+        var didWrite = false;
+
+        foreach (var globalWriter in Logs.GetGlobalWriters()) {
+            if (!globalWriter.CanWrite(ref message))
+                continue;
+
+            globalWriter.Write(ref message);
+            didWrite = true;
+
+            if (message.Consumed) {
+                break;
+            }
+
+            /*
+            if (message.Severity == LogLevel.Fatal) {
+                throw new CompilationException(output.ToString());
+            }
+
+            Console.WriteLine(output.ToString());
+            */
+        }
+
+        if (!didWrite) {
+            throw new Exception("Logger message was not written");
+        }
+
     }
 
-    // private void ConstructAndLogMessage(LogLevel logLevel, Caller caller, string text, params object[] args)
-        // => ConstructAndLogMessage(logLevel, caller, new Span(text), args);
+    public LogMessage Create([CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string method = "") {
+        var msg = new LogMessage(this, Caller.FromAttributes(file, line, method), LogLevel, Name);
+        return msg;
+    }
+    public LogMessage Create(Caller caller) {
+        var msg = new LogMessage(this, caller, LogLevel, Name);
+        return msg;
+    }
 
     private void ConstructAndLogMessage(LogLevel logLevel, Caller caller, string text, params object[] args) {
-        if (!CanLogMessage(logLevel, caller))
-            return;
-
-        var msg = new LogMessage(this, caller, logLevel, text)
-           .WithArgs(args);
-        
-        foreach (var globalWriter in Logs.GetGlobalWriters()) {
-            if(msg.Severity == LogLevel.Fatal) {
-                var output = new StringBuilder();
-                globalWriter.Write(output, msg);
-                throw new CompilationException(output.ToString());
-            } else {
-                globalWriter.Write(msg);
-            }
-        }
-    }
-    /*
-    private void ConstructAndLogMessage(LogLevel logLevel, Caller caller, Span text, params object[] args) {
-        if (!CanLogMessage(LogLevel, caller))
-            return;
-
-        var msg = new LogMessage(this, caller, logLevel, text)
+        var msg = Create(caller)
+           .WithSeverity(logLevel)
+           .WithMessage(text)
            .WithArgs(args);
 
-        foreach (var globalWriter in Logs.GetGlobalWriters())
-            globalWriter.Write(msg);
-    }
-    private void ConstructAndLogMessage(LogLevel logLevel, Caller caller, ElementCollection text, params object[] args) {
-        if (!CanLogMessage(LogLevel, caller))
+        if (msg.IsEmpty)
             return;
 
-        var msg = new LogMessage(this, caller, logLevel, text)
-           .WithArgs(args);
+        if (Logs.LogConsumer(msg))
+            return;
 
-        foreach (var globalWriter in Logs.GetGlobalWriters())
-            globalWriter.Write(msg);
+        msg.Log();
     }
-    */
 
     private bool CanLogMessage(LogLevel level, Caller caller) {
         return level >= LogLevel && Logs.GetGlobalWriters().Any();
     }
 
-    public void Debug(string            text)                                               => ConstructAndLogMessage(LogLevel.Debug, Caller.GetFromFrame(), text);
-    // public void Debug(Span              text)                                               => ConstructAndLogMessage(LogLevel.Debug, Caller.GetFromFrame(), text);
-    // public void Debug(ElementCollection text)                                               => ConstructAndLogMessage(LogLevel.Debug, Caller.GetFromFrame(), text);
-    public void Debug(string            text, Caller          caller)                       => ConstructAndLogMessage(LogLevel.Debug, caller, text);
-    public void Debug(string            text, params object[] args)                         => ConstructAndLogMessage(LogLevel.Debug, Caller.GetFromFrame(), string.Format(text, args));
-    public void Debug(string            text, Caller          caller, params object[] args) => ConstructAndLogMessage(LogLevel.Debug, caller, string.Format(text, args));
+
+    public void Debug(string text)                                               => ConstructAndLogMessage(LogLevel.Debug, Caller.GetFromFrame(), text);
+    public void Debug(string text, Caller          caller)                       => ConstructAndLogMessage(LogLevel.Debug, caller, text);
+    public void Debug(string text, params object[] args)                         => ConstructAndLogMessage(LogLevel.Debug, Caller.GetFromFrame(), string.Format(text, args));
+    public void Debug(string text, Caller          caller, params object[] args) => ConstructAndLogMessage(LogLevel.Debug, caller, string.Format(text, args));
 
     public void Info(string text)                                               => ConstructAndLogMessage(LogLevel.Info, Caller.GetFromFrame(), text);
     public void Info(string text, Caller          caller)                       => ConstructAndLogMessage(LogLevel.Info, caller, text);
@@ -103,4 +147,24 @@ public class Logger
     public void Fatal(string text, Caller          caller)                       => ConstructAndLogMessage(LogLevel.Fatal, caller, text);
     public void Fatal(string text, params object[] args)                         => ConstructAndLogMessage(LogLevel.Fatal, Caller.GetFromFrame(2), string.Format(text, args));
     public void Fatal(string text, Caller          caller, params object[] args) => ConstructAndLogMessage(LogLevel.Fatal, caller, string.Format(text, args));
+
+    public void Exception(Exception ex) {
+        Caller caller;
+        if (ex is BaseLanguageException ble) {
+            caller = ble.Caller;
+        } else {
+            caller = Caller.FromException(ex);
+        }
+        
+        if(!caller.IsValid())
+            caller = Caller.FromException(ex);
+
+        var isFatal = ex is FatalInterpreterException;
+        Create(caller)
+           .WithSeverity(isFatal ? LogLevel.Fatal : LogLevel.Error)
+           .WithMessage(ex.Message)
+           .WithContext(ex)
+
+           .Log();
+    }
 }

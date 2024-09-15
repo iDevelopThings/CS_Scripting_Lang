@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Reflection;
+using System.Text;
 using Terminal.Gui;
 
 namespace CSScriptingLang.Utils;
@@ -7,14 +8,7 @@ public static class StringExtensions
 {
     public static string ToColoredTimeString(this TimeSpan @this) {
 
-        string formattedTime;
-        if (@this.TotalMilliseconds < 1) {
-            formattedTime = $"{@this.TotalMicroseconds}us";
-        } else if (@this.TotalSeconds < 1) {
-            formattedTime = $"{@this.TotalMilliseconds:F1}ms";
-        } else {
-            formattedTime = $"{@this.TotalSeconds:F1}s";
-        }
+        var formattedTime = @this.FormattedTime();
 
         var timeColor = @this.TotalMilliseconds switch {
             < 1    => AnsiCodes.BrightGreen,
@@ -25,6 +19,61 @@ public static class StringExtensions
         };
 
         return formattedTime.Colored(timeColor);
+    }
+    private static string FormattedTime(this TimeSpan @this) {
+        string formattedTime;
+        if (@this.TotalMilliseconds < 1) {
+            formattedTime = $"{@this.TotalMicroseconds}us";
+        } else if (@this.TotalSeconds < 1) {
+            formattedTime = $"{@this.TotalMilliseconds:F1}ms";
+        } else {
+            formattedTime = $"{@this.TotalSeconds:F1}s";
+        }
+
+        return formattedTime;
+    }
+
+    public static string FirstCharToLower(this string @this) {
+        if (string.IsNullOrEmpty(@this)) {
+            return @this;
+        }
+
+        var a = @this.ToCharArray();
+        a[0] = char.ToLower(a[0]);
+        return new string(a);
+    }
+
+    public static string ToSnakeCase(this string @this) {
+        if (string.IsNullOrEmpty(@this)) {
+            return @this;
+        }
+
+        var sb = new StringBuilder();
+        for (var i = 0; i < @this.Length; i++) {
+            var c = @this[i];
+            if (char.IsUpper(c)) {
+                if (i > 0) {
+                    sb.Append('_');
+                }
+
+                sb.Append(char.ToLower(c));
+            } else {
+                sb.Append(c);
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    public static string ToClassNameSpaceMethodName(this MethodInfo method, bool includeNs = true) {
+        var name      = method.Name;
+        var className = method.DeclaringType?.Name;
+        var ns        = method.DeclaringType?.Namespace;
+
+        if (!includeNs)
+            return $"{className}.{name}";
+
+        return $"{ns}.{className}.{name}";
     }
 
     public static string ToShortName(this Type @this) {
@@ -50,6 +99,76 @@ public static class StringExtensions
         }
 
         return name;
+    }
+    
+    public static string ToFullLinkedName(this Type @this) {
+        var name = @this.Name;
+        name = name.Split('.').Last();
+
+        if (@this.IsGenericType) {
+            var index = name.IndexOf('`');
+            if (index != -1) {
+                name = name[..index];
+            }
+
+            name += "<";
+            var genericArgs = @this.GetGenericArguments();
+            for (var i = 0; i < genericArgs.Length; i++) {
+                name += genericArgs[i].ToShortName();
+                if (i < genericArgs.Length - 1) {
+                    name += ", ";
+                }
+            }
+
+            name += ">";
+        }
+
+        return $"{@this.Namespace}.{name}";
+    }
+}
+
+public enum AnsiColorCodes
+{
+    Gray,
+    BrightGray,
+    Red,
+    BrightRed,
+    Green,
+    BrightGreen,
+    Yellow,
+    BrightYellow,
+    Blue,
+    BrightBlue,
+    Magenta,
+    BrightMagenta,
+    Cyan,
+    BrightCyan,
+    White,
+    BrightWhite
+}
+
+public static class AnsiColorExtensions
+{
+    public static string ToAnsiColor(this AnsiColorCodes colorCodes) {
+        return colorCodes switch {
+            AnsiColorCodes.Gray          => AnsiCodes.Gray,
+            AnsiColorCodes.BrightGray    => AnsiCodes.BrightGray,
+            AnsiColorCodes.Red           => AnsiCodes.Red,
+            AnsiColorCodes.BrightRed     => AnsiCodes.BrightRed,
+            AnsiColorCodes.Green         => AnsiCodes.Green,
+            AnsiColorCodes.BrightGreen   => AnsiCodes.BrightGreen,
+            AnsiColorCodes.Yellow        => AnsiCodes.Yellow,
+            AnsiColorCodes.BrightYellow  => AnsiCodes.BrightYellow,
+            AnsiColorCodes.Blue          => AnsiCodes.Blue,
+            AnsiColorCodes.BrightBlue    => AnsiCodes.BrightBlue,
+            AnsiColorCodes.Magenta       => AnsiCodes.Magenta,
+            AnsiColorCodes.BrightMagenta => AnsiCodes.BrightMagenta,
+            AnsiColorCodes.Cyan          => AnsiCodes.Cyan,
+            AnsiColorCodes.BrightCyan    => AnsiCodes.BrightCyan,
+            AnsiColorCodes.White         => AnsiCodes.White,
+            AnsiColorCodes.BrightWhite   => AnsiCodes.BrightWhite,
+            _                       => AnsiCodes.Reset
+        };
     }
 }
 
@@ -144,50 +263,59 @@ public static class AnsiStringExtensions
 
     public static string Colored(this string str, string color) => $"{color}{str}{AnsiCodes.Reset}";
 
-    public static string Gray(this       string str) => $"{AnsiCodes.Gray}{str}{AnsiCodes.Reset}";
+    public static string Gray(this           string str) => $"{AnsiCodes.Gray}{str}{AnsiCodes.Reset}";
     public static string BoldGray(this       string str) => str.Bold().Gray();
-    public static string BrightGray(this string str) => $"{AnsiCodes.BrightGray}{str}{AnsiCodes.Reset}";
+    public static string BrightGray(this     string str) => $"{AnsiCodes.BrightGray}{str}{AnsiCodes.Reset}";
     public static string BoldBrightGray(this string str) => str.Bold().BrightGray();
 
-    public static string Red(this       string str) => $"{AnsiCodes.Red}{str}{AnsiCodes.Reset}";
+    public static string Red(this           string str) => $"{AnsiCodes.Red}{str}{AnsiCodes.Reset}";
     public static string BoldRed(this       string str) => str.Bold().Red();
-    public static string BrightRed(this string str) => $"{AnsiCodes.BrightRed}{str}{AnsiCodes.Reset}";
+    public static string BrightRed(this     string str) => $"{AnsiCodes.BrightRed}{str}{AnsiCodes.Reset}";
     public static string BoldBrightRed(this string str) => str.Bold().BrightRed();
 
-    public static string Green(this       string str) => $"{AnsiCodes.Green}{str}{AnsiCodes.Reset}";
+    public static string Green(this           string str) => $"{AnsiCodes.Green}{str}{AnsiCodes.Reset}";
     public static string BoldGreen(this       string str) => str.Bold().Green();
-    public static string BrightGreen(this string str) => $"{AnsiCodes.BrightGreen}{str}{AnsiCodes.Reset}";
+    public static string BrightGreen(this     string str) => $"{AnsiCodes.BrightGreen}{str}{AnsiCodes.Reset}";
     public static string BoldBrightGreen(this string str) => str.Bold().BrightGreen();
 
-    public static string Yellow(this       string str) => $"{AnsiCodes.Yellow}{str}{AnsiCodes.Reset}";
+    public static string Yellow(this           string str) => $"{AnsiCodes.Yellow}{str}{AnsiCodes.Reset}";
     public static string BoldYellow(this       string str) => str.Bold().Yellow();
-    public static string BrightYellow(this string str) => $"{AnsiCodes.BrightYellow}{str}{AnsiCodes.Reset}";
+    public static string BrightYellow(this     string str) => $"{AnsiCodes.BrightYellow}{str}{AnsiCodes.Reset}";
     public static string BoldBrightYellow(this string str) => str.Bold().BrightYellow();
 
-    public static string Blue(this       string str) => $"{AnsiCodes.Blue}{str}{AnsiCodes.Reset}";
+    public static string Blue(this           string str) => $"{AnsiCodes.Blue}{str}{AnsiCodes.Reset}";
     public static string BoldBlue(this       string str) => str.Bold().Blue();
-    public static string BrightBlue(this string str) => $"{AnsiCodes.BrightBlue}{str}{AnsiCodes.Reset}";
+    public static string BrightBlue(this     string str) => $"{AnsiCodes.BrightBlue}{str}{AnsiCodes.Reset}";
     public static string BoldBrightBlue(this string str) => str.Bold().BrightBlue();
 
-    public static string Magenta(this       string str) => $"{AnsiCodes.Magenta}{str}{AnsiCodes.Reset}";
+    public static string Magenta(this           string str) => $"{AnsiCodes.Magenta}{str}{AnsiCodes.Reset}";
     public static string BoldMagenta(this       string str) => str.Bold().Magenta();
-    public static string BrightMagenta(this string str) => $"{AnsiCodes.BrightMagenta}{str}{AnsiCodes.Reset}";
+    public static string BrightMagenta(this     string str) => $"{AnsiCodes.BrightMagenta}{str}{AnsiCodes.Reset}";
     public static string BoldBrightMagenta(this string str) => str.Bold().BrightMagenta();
 
-    public static string Cyan(this       string str) => $"{AnsiCodes.Cyan}{str}{AnsiCodes.Reset}";
+    public static string Cyan(this           string str) => $"{AnsiCodes.Cyan}{str}{AnsiCodes.Reset}";
     public static string BoldCyan(this       string str) => str.Bold().Cyan();
-    public static string BrightCyan(this string str) => $"{AnsiCodes.BrightCyan}{str}{AnsiCodes.Reset}";
+    public static string BrightCyan(this     string str) => $"{AnsiCodes.BrightCyan}{str}{AnsiCodes.Reset}";
     public static string BoldBrightCyan(this string str) => str.Bold().BrightCyan();
 
-    public static string White(this       string str) => $"{AnsiCodes.White}{str}{AnsiCodes.Reset}";
+    public static string White(this           string str) => $"{AnsiCodes.White}{str}{AnsiCodes.Reset}";
     public static string BoldWhite(this       string str) => str.Bold().White();
-    public static string BrightWhite(this string str) => $"{AnsiCodes.BrightWhite}{str}{AnsiCodes.Reset}";
+    public static string BrightWhite(this     string str) => $"{AnsiCodes.BrightWhite}{str}{AnsiCodes.Reset}";
     public static string BoldBrightWhite(this string str) => str.Bold().BrightWhite();
+
+    public static string ColorIf(this string str, bool condition, AnsiColorCodes colorCodes) => str.ColorIf(condition, colorCodes.ToAnsiColor());
+    public static string ColorIf(this string str, bool condition, string color) {
+        return condition ? str.Colored(color) : str;
+    }
 
     /// <summary>
     /// This will parse our string and replace <colorName>some text</> with the appropriate color tag
     /// </summary>
-    public static string ApplyColorTags(this string str) {
+    public static string ApplyColorTags(this string str, bool allowColors = true) {
+        if (!allowColors) {
+            return str;
+        }
+
         var sb         = new StringBuilder();
         var colorStack = new Stack<string>();
 

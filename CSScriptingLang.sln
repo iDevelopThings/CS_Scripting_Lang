@@ -8,6 +8,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CSScriptingLangGenerators.T
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LanguageTests", "LanguageTests\LanguageTests.csproj", "{EF6D755B-7704-4117-A584-92D7814F75D7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CSScriptingLang.Common", "CSScriptingLang.Common\CSScriptingLang.Common.csproj", "{B81D5C6D-7960-449F-83BF-894AA0EC02E3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CSScriptingLang.LSP", "CSScriptingLang.LSP\CSScriptingLang.LSP.csproj", "{BED9897F-2FB9-400B-853D-8AC9E9EB49A1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +34,13 @@ Global
 		{EF6D755B-7704-4117-A584-92D7814F75D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EF6D755B-7704-4117-A584-92D7814F75D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EF6D755B-7704-4117-A584-92D7814F75D7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B81D5C6D-7960-449F-83BF-894AA0EC02E3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B81D5C6D-7960-449F-83BF-894AA0EC02E3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B81D5C6D-7960-449F-83BF-894AA0EC02E3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B81D5C6D-7960-449F-83BF-894AA0EC02E3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BED9897F-2FB9-400B-853D-8AC9E9EB49A1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BED9897F-2FB9-400B-853D-8AC9E9EB49A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BED9897F-2FB9-400B-853D-8AC9E9EB49A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BED9897F-2FB9-400B-853D-8AC9E9EB49A1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

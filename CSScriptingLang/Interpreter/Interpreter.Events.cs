@@ -1,12 +1,14 @@
-﻿namespace CSScriptingLang.Interpreter;
+﻿using CSScriptingLang.Interpreter.Context;
+
+namespace CSScriptingLang.Interpreter;
 
 public static class InterpreterEvents
 {
-    public static Action<InterpreterExecutionContext> OnExecutionScopePushed;
-    public static Action<InterpreterExecutionContext> OnExecutionScopePopped;
+    // public static Action<InterpreterExecutionContext> OnExecutionScopePushed;
+    // public static Action<InterpreterExecutionContext> OnExecutionScopePopped;
 
-    public static Action<FunctionExecutionFrame> OnFunctionFramePushed;
-    public static Action<FunctionExecutionFrame> OnFunctionFramePopped;
+    public static Action<Frame> OnFunctionFramePushed;
+    public static Action<Frame> OnFunctionFramePopped;
 }
 
 public partial class Interpreter { }

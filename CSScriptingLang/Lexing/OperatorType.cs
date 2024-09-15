@@ -1,36 +1,130 @@
+using System.Reflection;
 
 namespace CSScriptingLang.Lexing;
+
+[AttributeUsage(AttributeTargets.Enum | AttributeTargets.Field, AllowMultiple = true)]
+public class OperatorChars : Attribute
+{
+    public string Token      { get; set; }
+    public string Identifier { get; set; }
+
+    public OperatorChars(string token, string identifier) {
+        Token      = token;
+        Identifier = identifier;
+    }
+}
 
 public enum OperatorType
 {
     None,
 
-    Plus,               // +
-    PlusEquals,         // +=
-    Minus,              // -
-    MinusEquals,        // -=
-    Divide,             // /
-    Multiply,           // *
-    Modulus,            // %
-    Increment,          // ++
-    Decrement,          // --
-    Equals,             // ==
-    NotEquals,          // !=
-    GreaterThan,        // >
-    LessThan,           // <
-    GreaterThanOrEqual, // >=
-    LessThanOrEqual,    // <=
-    And,                // &&
-    BitwiseAnd,         // &
-    Pipe,               // |
-    Or,                 // ||
-    Not,                // !
-    Assignment,         // =
+    [OperatorChars("+", "add")]
+    Plus,
+
+    [OperatorChars("+=", "addAssign")]
+    PlusEquals,
+
+    [OperatorChars("++", "inc")]
+    Increment,
+
+    [OperatorChars("-", "sub")]
+    Minus,
+
+    [OperatorChars("-=", "subAssign")]
+    MinusEquals,
+
+    [OperatorChars("--", "dec")]
+    Decrement,
+
+    [OperatorChars("/", "div")]
+    Divide,
+
+    [OperatorChars("*", "mul")]
+    Multiply,
+
+    [OperatorChars("%", "mod")]
+    Modulus,
+
+    [OperatorChars("^", "pow")]
+    Pow,
+
+    [OperatorChars("==", "eq")]
+    Equals,
+
+    [OperatorChars("!=", "neq")]
+    NotEquals,
+
+    [OperatorChars(">", "gt")]
+    GreaterThan,
+
+    [OperatorChars("<", "lt")]
+    LessThan,
+
+    [OperatorChars(">=", "gte")]
+    GreaterThanOrEqual,
+
+    [OperatorChars("<=", "lte")]
+    LessThanOrEqual,
+
+    [OperatorChars("&&", "and")]
+    And,
+
+    [OperatorChars("&", "bitwiseAnd")]
+    BitwiseAnd,
+
+    [OperatorChars("|", "pipe")]
+    Pipe,
+
+    [OperatorChars("||", "or")]
+    Or,
+
+    [OperatorChars("!", "not")]
+    Not,
+
+    [OperatorChars("=", "assign")]
+    Assignment,
+}
+
+public class OperatorTypes
+{
+    public static Dictionary<string, OperatorType> TokenToOperatorType      { get; } = new();
+    public static Dictionary<string, OperatorType> IdentifierToOperatorType { get; } = new();
+    public static Dictionary<OperatorType, string> OperatorTypeToToken      { get; } = new();
+
+    // For ex, with (`+` `++` `+=`), `OperatorCharCount['+']` will be 2
+    // This will let the lexer read the correct number of characters for the operator
+    public static Dictionary<char, int> OperatorCharCount { get; } = new();
+
+    static OperatorTypes() {
+
+        var enumType = typeof(OperatorType);
+        var fields   = enumType.GetFields(BindingFlags.Public | BindingFlags.Static);
+
+        foreach (var field in fields) {
+            var attr = field.GetCustomAttribute<OperatorChars>();
+            if (attr == null) {
+                continue;
+            }
+
+            var token      = attr.Token;
+            var identifier = attr.Identifier;
+            var op         = (OperatorType) field.GetValue(null)!;
+
+            TokenToOperatorType[token]           = op;
+            IdentifierToOperatorType[identifier] = op;
+            OperatorTypeToToken[op]              = token;
+
+            if (OperatorCharCount.ContainsKey(token[0])) {
+                OperatorCharCount[token[0]] = Math.Max(OperatorCharCount[token[0]], token.Length);
+            } else {
+                OperatorCharCount.Add(token[0], token.Length);
+            }
+        }
+    }
 }
 
 public static class OperatorTypeExtensions
 {
-
     public static bool IsBinaryArithmetic(this OperatorType op) {
         return op switch {
             OperatorType.Plus     => true,
@@ -41,7 +135,7 @@ public static class OperatorTypeExtensions
             _                     => false,
         };
     }
-    
+
     public static bool IsUnaryArithmetic(this OperatorType op) {
         return op switch {
             OperatorType.Increment => true,
@@ -49,7 +143,7 @@ public static class OperatorTypeExtensions
             _                      => false,
         };
     }
-    
+
     public static bool IsComparison(this OperatorType op) {
         return op switch {
             OperatorType.Equals             => true,
@@ -61,7 +155,7 @@ public static class OperatorTypeExtensions
             _                               => false,
         };
     }
-    
+
     public static bool IsLogical(this OperatorType op) {
         return op switch {
             OperatorType.And => true,

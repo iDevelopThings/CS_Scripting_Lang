@@ -1,56 +1,90 @@
-using CSScriptingLang.RuntimeValues;
+using System.Diagnostics;
 using CSScriptingLang.RuntimeValues.Types;
+using CSScriptingLang.RuntimeValues.Values;
 
 namespace CSScriptingLang.Interpreter;
 
-public class Symbol
+[DebuggerDisplay($"{{{nameof(ToDebugString)}(),nq}}")]
+public class VariableSymbol
 {
     public string Name { get; set; }
 
-    private RuntimeValue _value;
-    public RuntimeValue Value {
-        get => _value;
-        set {
-            var currentRefs = _value?.References;
-            _value?.RemoveReference(this);
-            _value = value;
-            if (_value != null && _value.Symbol != this) {
-                _value.SetSymbol(this);
-                _value.AddReference(currentRefs);
-            }
-        }
+    public Value Val { get; set; }
+
+    public VariableSymbol Reference { get; set; }
+
+    public object RawValue => Val?.GetUntypedValue();
+
+    // When true, the variable is defined, but just for declaration purposes
+    // So it's safe to set the value/override it
+    public bool IsBaseDeclaration { get; set; }
+
+    public T NativeValue<T>() where T : notnull => throw new System.NotImplementedException();
+
+    public VariableSymbol(string name) {
+        Name = name;
+        Val  = Value.Null();
+    }
+    public VariableSymbol(string name, Value value) {
+        Name = name;
+        Val  = value;
     }
 
-    public object RawValue => Value?.Value;
-
-    public int ReferenceCount => Value?.ReferenceCount ?? 0;
-
-    public RuntimeTypeInfo Type => Value?.RuntimeType;
-
-    public T As<T>() where T : RuntimeValue => Value as T;
-
-    public static implicit operator RuntimeValue_Array(Symbol    s) => s.As<RuntimeValue_Array>();
-    public static implicit operator RuntimeValue_Object(Symbol   s) => s.As<RuntimeValue_Object>();
-    public static implicit operator RuntimeValue_Function(Symbol s) => s.As<RuntimeValue_Function>();
-
-    public Symbol(string name, RuntimeValue value) {
-        Name  = name;
-        Value = value;
-        if (Value == null) {
-            Value = RuntimeValue.RentNull();
+    public string ToDebugString() {
+        if (Val != null) {
+            return $"{Name} : {Val?.Type} = {Val?.ToString()}";
         }
 
-        Value?.SetSymbol(this);
+        return $"{Name} : null";
+    }
+    public void IsReference(VariableSymbol argSymbol) {
+        Reference = argSymbol;
+    }
+}
+
+[DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
+public class Symbol
+{
+    private static   long Counter; // Ensures uniqueness
+    private readonly long Id;      // Unique ID for each symbol
+
+    public string Name { get; }
+
+    private static Dictionary<string, Symbol> Registry { get; set; } = new();
+
+    private Symbol(string name) {
+        Id   = ++Counter;
+        Name = name;
     }
 
-    public void AddReference(object    reference) => Value?.AddReference(reference);
-    public void RemoveReference(object reference) => Value?.RemoveReference(reference);
-    public string GetReferencesString(bool inlineString = false) {
-        var values = Value.References.Select(r => $"\t\t{(inlineString ? "" : "- ")} {r.ToString()}");
-        if (inlineString) {
-            return string.Join(", ", values);
+    // Factory method for creating new symbols
+    public static Symbol Create(string name = null) {
+        return new Symbol(name);
+    }
+
+    public static Symbol For(string name) {
+        if (Registry.TryGetValue(name, out Symbol value))
+            return value;
+
+        value          = Create(name);
+        Registry[name] = value;
+
+        return value;
+    }
+
+    public override bool Equals(object obj) {
+        if (obj is Symbol otherSymbol) {
+            return Id == otherSymbol.Id;
         }
 
-        return string.Join("\n", values);
+        return false;
+    }
+
+    public override int GetHashCode() {
+        return Id.GetHashCode();
+    }
+
+    public override string ToString() {
+        return Name != null ? $"Symbol({Name})" : $"Symbol()";
     }
 }

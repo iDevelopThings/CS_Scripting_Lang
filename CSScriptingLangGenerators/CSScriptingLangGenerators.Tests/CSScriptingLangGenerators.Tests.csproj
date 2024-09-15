@@ -6,12 +6,13 @@
         <IsPackable>false</IsPackable>
         <RootNamespace>CSScriptingLangGenerators.Tests</RootNamespace>
         <TargetPlatformIdentifier>Windows</TargetPlatformIdentifier>
+        <IsTestProject>true</IsTestProject>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp.SourceGenerators.Testing.XUnit" Version="1.1.1"/>
     </ItemGroup>
-    
+
     <ItemGroup>
         <PackageReference Include="coverlet.collector" Version="6.0.0"/>
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0"/>
@@ -24,11 +25,9 @@
         <Using Include="NUnit.Framework"/>
     </ItemGroup>
 
-
     <ItemGroup>
-        <!--<ProjectReference Include="..\..\CSScriptingLang\CSScriptingLang.csproj" />-->
-        <ProjectReference Include="..\CSScriptingLangGenerators\CSScriptingLangGenerators.csproj"/>
+      <ProjectReference Include="..\CSScriptingLangGenerators\CSScriptingLangGenerators.csproj" />
     </ItemGroup>
-
+    
 
 </Project>

@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
+using CSScriptingLangGenerators.Bindings;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
@@ -77,18 +78,6 @@ namespace {Namespace}
 
         return (classDeclarationSyntax, false);
     }
-
-    public const string MissingOperandTypeId = "CSSG001";
-
-    private static readonly DiagnosticDescriptor MissingOperandType = new(
-        MissingOperandTypeId,
-        "Missing operand type",
-        "Missing operand type",
-        "InstructionsSourceGenerator",
-        DiagnosticSeverity.Error,
-        true
-    );
-
     private void GenerateCode(
         SourceProductionContext                context,
         Compilation                            compilation,
@@ -128,7 +117,7 @@ namespace {Namespace}
             }
 
             if (operandType == null) {
-                context.ReportDiagnostic(Diagnostic.Create(MissingOperandType, classDeclarationSyntax.GetLocation()));
+                context.ReportDiagnostic(Diagnostic.Create(Diagnostics.MissingOperandType, classDeclarationSyntax.GetLocation()));
                 continue;
             }
 

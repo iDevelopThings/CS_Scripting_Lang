@@ -3,9 +3,11 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using CSScriptingLangGenerators.Utils;
+using CSScriptingLangGenerators.Utils.CodeWriter;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
+using CSharpExtensions = Microsoft.CodeAnalysis.CSharp.CSharpExtensions;
 
 
 namespace CSScriptingLangGenerators;
@@ -22,7 +24,7 @@ public class AstNodeSourceGenerator : IIncrementalGenerator
         if (_loadedDerivedTypes)
             return _derivedTypes;
 
-        BaseNode = compilation.GetTypeByMetadataName("CSScriptingLang.Parsing.AST.BaseNode");
+        BaseNode = compilation.GetTypeByMetadataName($"{Constants.ASTNamespace}.BaseNode");
 
         _derivedTypes       = ClassUtils.GetDerivedTypes(compilation, BaseNode);
         _loadedDerivedTypes = true;
@@ -87,28 +89,36 @@ public class AstNodeSourceGenerator : IIncrementalGenerator
         if (symbol.BaseType is null)
             return null;
 
-        if (symbol.ContainingNamespace.ToDisplayString() != "CSScriptingLang.Parsing.AST")
+        if (!Constants.IsNodeNamespace(symbol.ContainingNamespace))
             return null;
 
         return classDeclaration;
     }
 
     private void ExecuteVisitor(Compilation compilation, IEnumerable<ClassDeclarationSyntax> classes, SourceProductionContext context) {
-        var source = new StringBuilder();
-        source.AppendLine("using System.Collections.Generic;");
-        source.AppendLine("namespace CSScriptingLang.Parsing.AST;");
+        var w = new Writer();
+        w.WithNamespace(Constants.ASTNamespace);
+        w.WithImports([
+            "System.Collections.Generic",
+        ]);
 
-        var visitorInterfaceSb = new StringBuilder();
-        visitorInterfaceSb.AppendLine("public partial interface IAstVisitor {");
+        var visitorInterface = new Writer();
+        visitorInterface._("public partial interface IAstVisitor");
+        visitorInterface.OpenBracket();
+        visitorInterface._("void OnVisitAny(BaseNode node);");
 
-        var visitorSb = new StringBuilder();
-        visitorSb.AppendLine("public partial class BaseAstVisitor : IAstVisitor {");
+        var visitor = new Writer();
+        visitor._("public partial class BaseAstVisitor : IAstVisitor");
+        visitor.OpenBracket();
+        visitor._("public virtual void OnVisitAny(BaseNode node) { }");
 
         foreach (var classDeclaration in classes) {
             var model       = compilation.GetSemanticModel(classDeclaration.SyntaxTree);
             var classSymbol = model.GetDeclaredSymbol(classDeclaration);
             if (classSymbol is null)
                 continue;
+
+            w.AddReferencedType(classSymbol);
 
             var className = classSymbol.Name;
             if (classDeclaration.TypeParameterList is not null) {
@@ -119,45 +129,46 @@ public class AstNodeSourceGenerator : IIncrementalGenerator
                 className += $"<{string.Join(", ", typeParameters)}>";
             }
 
-            visitorInterfaceSb.AppendLine($"    void Visit{className}({className} node);");
-
-            visitorSb.AppendLine($@"
-    public virtual void Visit{className}({className} node) {{
-        if (!_visitedNodes.Add(node))
-            return;
-        
-        foreach (var child in node.AllNodes()) {{
-            child?.Accept(this);
-        }}
-    }}"
-            );
-
+            visitorInterface._($"void Visit{className}({className} node);");
+            
+            using(visitor.B($"public virtual void Visit{className}({className} node)")) {
+                using(visitor.B("if (!_visitedNodes.Add(node))")) {
+                    visitor._("return;");
+                }
+                visitor._("OnVisitAny(node);");
+                using(visitor.B("foreach (var child in node.AllNodes())")) {
+                    visitor._("child?.Accept(this);");
+                }
+            }
         }
 
-        visitorInterfaceSb.AppendLine("}");
-        visitorSb.AppendLine("}");
+        visitor.CloseBracket();
+        visitorInterface.CloseBracket();
 
-        source.AppendLine(visitorInterfaceSb.ToString());
-        source.AppendLine(visitorSb.ToString());
+        w._(visitorInterface.ToString());
+        w._(visitor.ToString());
 
-        context.AddSource($"IAstVisitor.g.cs", SourceText.From(source.ToString(), Encoding.UTF8));
+        context.AddSource($"IAstVisitor.g.cs", SourceText.From(w.ToString(), Encoding.UTF8));
     }
 
     private void Execute(Compilation compilation, IEnumerable<ClassDeclarationSyntax> classes, SourceProductionContext context) {
-        var source = new StringBuilder();
-        source.AppendLine("using System.Collections.Generic;");
-        source.AppendLine("namespace CSScriptingLang.Parsing.AST;");
-
 
         foreach (var classDeclaration in classes) {
-            var model       = compilation.GetSemanticModel(classDeclaration.SyntaxTree);
-            var classSymbol = model.GetDeclaredSymbol(classDeclaration);
-            if (classSymbol is null)
+            var model = compilation.GetSemanticModel(classDeclaration.SyntaxTree);
+            if (model.GetDeclaredSymbol(classDeclaration) is not INamedTypeSymbol classSymbol)
                 continue;
 
-            // var namespaceName = classSymbol.ContainingNamespace.ToDisplayString();
-            var className   = classSymbol.Name;
-            var nodesMethod = GenerateNodesMethod(classDeclaration, model);
+            var derived = GetDerivedTypes(model.Compilation);
+
+            var w = new Writer();
+            w.WithImports(
+                "System.Collections.Generic",
+                Constants.ASTNamespace
+            );
+            
+            w.WithNamespace(classSymbol.ContainingNamespace.ToDisplayString());
+
+            var className = classSymbol.Name;
 
             // Skip this class if it already has a `AllNodes` method
             if (
@@ -167,7 +178,8 @@ public class AstNodeSourceGenerator : IIncrementalGenerator
             )
                 continue;
 
-            // handle class name generics
+            w.AddReferencedType(classSymbol);
+
             if (classDeclaration.TypeParameterList is not null) {
                 var typeParameters = classDeclaration.TypeParameterList.Parameters
                    .Select(p => p.Identifier.Text)
@@ -176,18 +188,78 @@ public class AstNodeSourceGenerator : IIncrementalGenerator
                 className += $"<{string.Join(", ", typeParameters)}>";
             }
 
-            source.AppendLine($@"
-    public partial class {className} {{
-        public override void Accept(IAstVisitor visitor) {{
-            visitor.Visit{className}(this);
-        }}
-        {nodesMethod}
-    }}
-");
+            using (w.B($"public partial class {className}")) {
+                using (w.B("public override void Accept(IAstVisitor visitor)")) {
+                    w._($"visitor.Visit{className}(this);");
+                }
+
+                var nodeProps = classSymbol.GetMembers()
+                   .OfType<IPropertySymbol>()
+                   .Where(p => {
+                        return p.HasAttribute("VisitableNodePropertyAttribute");
+                    })
+                   .ToList();
+
+                using (w.B("public override IEnumerable<BaseNode> AllNodes()")) {
+                    foreach (var property in nodeProps) {
+                        var type = property.Type;
+                        var name = property.Name;
+
+                        if (type is INamedTypeSymbol {IsGenericType: true} namedTypeSymbol) {
+                            var typeArguments = namedTypeSymbol.TypeArguments
+                               .Select(t => t.Name)
+                               .ToList();
+
+                            w.AddReferencedType(namedTypeSymbol);
+
+                            using (w.B($"if({name} != null)")) {
+
+                                if (namedTypeSymbol.Name == "Dictionary") {
+                                    var selector = typeArguments[0] == "String" ? "Value" : "Key";
+                                    if (typeArguments.Count == 2 && typeArguments[0] == "String") {
+                                        using (w.B($"foreach (var kvp in {name})")) {
+                                            using (w.B($"if (kvp.{selector} != null)")) {
+                                                w._($"yield return kvp.{selector};");
+                                            }
+                                        }
+
+                                        continue;
+                                    }
+                                }
+
+                                if (namedTypeSymbol.Name is "List" or "IEnumerable") {
+                                    using (w.B($"foreach (var item in {name})")) {
+                                        using (w.B($"if (item != null)")) {
+                                            w._($"yield return item;");
+                                        }
+                                    }
+
+                                    continue;
+                                }
+
+                            }
+
+                        }
+
+                        using (w.B($"if({name} != null)")) {
+                            w._($"yield return {name};");
+                        }
+                    }
+
+                    using (w.B("foreach (var node in base.AllNodes())")) {
+                        using (w.B("if (node != null)")) {
+                            w._("yield return node;");
+                        }
+                    }
+                }
+            }
+
+            var fileName = className.Replace("`", "_").Replace("<", "_").Replace(">", "_");
+            context.AddSource($"{fileName}.AllNodes.g.cs", SourceText.From(w.ToString(), Encoding.UTF8));
 
         }
 
-        context.AddSource($"GetAllNodesMethods.g.cs", SourceText.From(source.ToString(), Encoding.UTF8));
+        // context.AddSource($"GetAllNodesMethods.g.cs", SourceText.From(source.ToString(), Encoding.UTF8));
     }
 
     private string GenerateNodesMethod(ClassDeclarationSyntax classDeclaration, SemanticModel model) {
@@ -196,32 +268,6 @@ public class AstNodeSourceGenerator : IIncrementalGenerator
 
         var derived = GetDerivedTypes(model.Compilation);
 
-        /*
-        var baseTypes = classDeclaration.BaseList?.Types.ToList() ?? new List<BaseTypeSyntax>();
-
-        foreach (var baseType in baseTypes) {
-            var typeInfo = model.GetTypeInfo(baseType.Type);
-            if (typeInfo.Type is null)
-                continue;
-            if (typeInfo.Type.Name == "BaseNode")
-                continue;
-
-            var baseTypePropertySymbols = typeInfo.Type.GetMembers().OfType<IPropertySymbol>();
-            var baseTypeProperties = baseTypePropertySymbols
-                   .Select(
-                        p => p.DeclaringSyntaxReferences.First().GetSyntax() as PropertyDeclarationSyntax
-                    )
-                   .Where(p => p != null)
-                ;
-               // .Where(p => p.AccessorList?.Accessors.Count == 2);
-
-            propertyDeclarations = propertyDeclarations.Concat(baseTypeProperties);
-
-        }*/
-
-        // propertyDeclarations = propertyDeclarations.Concat(
-        //     parents?.Select(p => p.DeclaringSyntaxReferences.First().GetSyntax() as PropertyDeclarationSyntax) ?? Enumerable.Empty<PropertyDeclarationSyntax>()
-        // );
 
         var nodeProperties = propertyDeclarations
                .Where(prop => {
@@ -237,32 +283,8 @@ public class AstNodeSourceGenerator : IIncrementalGenerator
                         return true;
 
                     return false;
-                    /*
-                    var typeInfo = model.GetTypeInfo(prop.Type);
-                    var isNodeType = typeInfo.Type != null &&
-                                     derived.Any(d => SymbolEqualityComparer.Default.Equals(d, typeInfo.Type));
-                    if (!isNodeType)
-                        return false;
-
-                    /*if (prop.AccessorList != null) {
-                        var hasGetter = false;
-                        var hasSetter = false;
-                        foreach (var accessor in prop.AccessorList.Accessors) {
-                            if (accessor.Keyword.Text == "get")
-                                hasGetter = true;
-                            if (accessor.Keyword.Text == "set")
-                                hasSetter = true;
-                        }
-
-                        if(hasGetter || (hasGetter && hasSetter))
-                            return true;
-                    }#1#
-
-
-                    return hasVisitableAttribute;*/
                 })
             ;
-        // .Select(prop => prop.Identifier.Text);
 
         var statements = string.Join(
             "\n",
@@ -297,7 +319,7 @@ foreach (var kvp in {p.Identifier.Text})
                         }
                     }
 
-                    if (namedTypeSymbol.Name == "List") {
+                    if (namedTypeSymbol.Name is "List" or "IEnumerable") {
                         outStr += $@"
 foreach (var item in {p.Identifier.Text})
     if (item != null)

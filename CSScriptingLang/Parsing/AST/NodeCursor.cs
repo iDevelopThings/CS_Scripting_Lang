@@ -1,4 +1,7 @@
-﻿namespace CSScriptingLang.Parsing.AST;
+﻿using CSScriptingLang.Lexing;
+using CSScriptingLang.Utils;
+
+namespace CSScriptingLang.Parsing.AST;
 
 public struct NodeCursor
 {
@@ -12,6 +15,96 @@ public struct NodeCursor
 
     public NodeCursorFirst First => new(Node);
     public NodeCursorAll   All   => new(Node);
+
+    public IEnumerable<Token> Tokens() {
+        if (Node.StartToken.Value == null || Node.EndToken.Value == null)
+            throw new Exception($"Node({Node?.GetType().ToShortName()}) does not have start and end tokens.");
+
+        var start = Node.StartToken;
+        var end   = Node.EndToken;
+
+        var processed = new HashSet<Token>();
+
+        IEnumerable<Token> AllTokens(BaseNode current) {
+
+
+            IEnumerable<Token> GetAllChildrenTokens(BaseNode node) {
+                yield return current.StartToken;
+
+                foreach (var child in node.AllNodes()) {
+                    if (child.StartToken.Value != null && child.EndToken.Value != null) {
+                        yield return child.StartToken;
+                        yield return child.EndToken;
+                    } else {
+                        throw new Exception($"Node({child?.GetType().ToShortName()}) does not have start and end tokens.");
+                    }
+
+                    foreach (var token in GetAllChildrenTokens(child)) {
+                        yield return token;
+                    }
+                }
+
+                yield return end;
+            }
+
+            foreach (var token in GetAllChildrenTokens(current)) {
+                if (processed.Add(token))
+                    yield return token;
+            }
+
+        }
+
+        var tokens = AllTokens(Node).ToList();
+        tokens.Sort((a, b) => a.Range.Start.CompareTo(b.Range.Start));
+        return tokens;
+    }
+
+    public class FailedToFindTokenRangeException : Exception
+    {
+        public FailedToFindTokenRangeException(string message) : base(message) { }
+    }
+
+    public List<Token> AllTokens() {
+        var tokens = new List<Token> {Node.StartToken};
+        var nodes  = Node.AllNodes().ToList();
+        foreach (var child in nodes) {
+            if (child.StartToken?.Value != null && child.EndToken?.Value != null) {
+                tokens.Add(child.StartToken);
+                tokens.Add(child.EndToken);
+            }
+        }
+
+        tokens.Add(Node.EndToken);
+
+        return tokens;
+    }
+
+    public (Token, Token) FindTokenRange() {
+        var minToken = Node.StartToken;
+        var maxToken = Node.EndToken;
+
+        var min = minToken.Range.Start;
+        var max = maxToken.Range.End;
+
+        var toks = AllTokens();
+
+        foreach (var tok in toks) {
+
+            if (tok.Range.Start < min) {
+                min      = tok.Range.Start;
+                minToken = tok;
+            }
+
+            if (tok.Range.End > max) {
+                max      = tok.Range.End;
+                maxToken = tok;
+            }
+        }
+
+        // Console.WriteLine($"All tokens: {allToks.Count}");
+
+        return (minToken, maxToken);
+    }
 }
 
 public struct NodeCursorFirst
@@ -28,16 +121,30 @@ public struct NodeCursorFirst
         parent = Parent(type);
         return parent != null;
     }
-    public BaseNode Parent(Type type = null) {
+
+    public IEnumerable<BaseNode> Parents(Type type = null) {
         var p = Node.Parent;
         while (p != null) {
+
+            foreach (var node in p.AllNodes()) {
+                if (type == null || node.GetType() == type)
+                    yield return node;
+            }
+
             if (type == null || p.GetType() == type)
-                return p;
+                yield return p;
+
             p = p.Parent;
         }
-
-        return null;
     }
+    public IEnumerable<T> Parents<T>() where T : BaseNode {
+        foreach (var node in Parents(typeof(T))) {
+            if (node is T t)
+                yield return t;
+        }
+    }
+
+    public BaseNode Parent(Type type = null) => Parents(type).FirstOrDefault();
 
     public bool Parent<T>(out T parent) where T : BaseNode {
         if (Parent(typeof(T)) is T t) {
@@ -104,6 +211,9 @@ public struct NodeCursorAll
 
     public IEnumerable<T> Children<T>(bool topLevelOnly = false) {
         foreach (var node in Node.AllNodes()) {
+            if(node == null)
+                continue;
+            
             if (node is T t) {
                 yield return t;
             }

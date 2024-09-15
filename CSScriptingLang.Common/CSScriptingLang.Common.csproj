@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+<!--        <TargetFramework>net8.0</TargetFramework>-->
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>disable</Nullable>
+        <RootNamespace>CSScriptingLang.Common</RootNamespace>
+        <TargetPlatformIdentifier>Windows</TargetPlatformIdentifier>
+        <TargetFramework>net8.0-windows</TargetFramework>
+    </PropertyGroup>
+
+</Project>
