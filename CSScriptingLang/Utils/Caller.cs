@@ -3,6 +3,10 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using CSScriptingLang.Common.Extensions;
+using CSScriptingLang.Core.Diagnostics;
+using CSScriptingLang.Lexing;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 
 namespace CSScriptingLang.Utils;
 
@@ -77,11 +81,13 @@ public struct Caller : IEquatable<Caller>
             File       = frame.GetFileName(),
             Line       = frame.GetFileLineNumber(),
             Method     = method,
-            MethodName = method?.Name
+            MethodName = method?.Name,
         };
     }
 
-    public override string ToString() => $"{Path.GetFullPath(File)}:{Line}:0\n{MethodFullName}";
+    public override string ToString() {
+        return $"{(File.IsNotNullOrEmpty() ? DocumentUri.FromFileSystemPath(Path.GetFullPath(File)) : "Unknown")}:{Line}:0\n{MethodFullName}";
+    }
 
     public static Caller FromException(Exception ex) {
         var site  = ex.TargetSite;
@@ -94,6 +100,25 @@ public struct Caller : IEquatable<Caller>
             MethodName = site?.Name
         };
     }
+
+    public static Caller TryGetFromException(Exception ex) {
+        Caller caller;
+        if (ex is BaseLanguageException ble) {
+            caller = ble.Caller;
+        } else if (ex is FatalDiagnosticException dex) {
+            caller = dex.Diagnostic.SourceCallerInfo;
+        } else {
+            caller = FromException(ex);
+        }
+
+        if (!caller.IsValid())
+            caller = FromException(ex);
+
+        return caller;
+    }
+
+    public static implicit operator DocumentUri(Caller caller)
+        => DocumentUri.FromFileSystemPath(Path.GetFullPath(caller.File));
 
     public bool Equals(Caller other) {
         return File == other.File && Line == other.Line && Equals(Method, other.Method) && MethodName == other.MethodName;
@@ -113,7 +138,7 @@ public struct CallerList : IEnumerable<Caller>
     public CallerList(params Caller[] callers) {
         _callers = new List<Caller>(callers);
     }
-    
+
     public bool IsEmpty() => _callers is {Count: 0};
 
     public static void Dump(string contextStr = "") {
@@ -178,9 +203,9 @@ public struct CallerList : IEnumerable<Caller>
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     public override string ToString() {
-        if(_callers is {Count: 0} or null)
+        if (_callers is {Count: 0} or null)
             return "No callers";
-        
+
         var sb = new StringBuilder();
 
         foreach (var caller in _callers) {

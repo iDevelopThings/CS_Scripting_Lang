@@ -1,5 +1,9 @@
-﻿using CSScriptingLang.Interpreter;
+﻿using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using CSScriptingLang.Common.Extensions;
+using CSScriptingLang.Interpreter;
 using CSScriptingLang.Interpreter.Modules;
+using CSScriptingLang.Lexing;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
@@ -25,123 +29,238 @@ public class SemanticTokensHandler : SemanticTokensHandlerBase
     }
 
 
-    public override async Task<SemanticTokens> Handle(
-        SemanticTokensParams request, CancellationToken cancellationToken
-    ) {
+    public override async Task<SemanticTokens> Handle(SemanticTokensParams request, CancellationToken cancellationToken) {
+        Debugger.Launch();
+
+        _logger.LogWarning("[SemanticTokensParams] Handling request {@Request}", request.ToString());
         var result = await base.Handle(request, cancellationToken).ConfigureAwait(false);
         return result;
     }
 
-    public override async Task<SemanticTokens> Handle(
-        SemanticTokensRangeParams request, CancellationToken cancellationToken
-    ) {
+    public override async Task<SemanticTokens> Handle(SemanticTokensRangeParams request, CancellationToken cancellationToken) {
+        Debugger.Launch();
+        _logger.LogWarning("[SemanticTokensRangeParams] Handling request {@Request}", request.ToString());
         var result = await base.Handle(request, cancellationToken).ConfigureAwait(false);
         return result;
     }
 
-    public override async Task<SemanticTokensFullOrDelta> Handle(
-        SemanticTokensDeltaParams request,
-        CancellationToken         cancellationToken
-    ) {
+    public override async Task<SemanticTokensFullOrDelta> Handle(SemanticTokensDeltaParams request, CancellationToken cancellationToken) {
+        Debugger.Launch();
+        _logger.LogWarning("[SemanticTokensDeltaParams] Handling request {@Request}", request.ToString());
         var result = await base.Handle(request, cancellationToken).ConfigureAwait(false);
         return result;
     }
 
-    protected override Task Tokenize(
-        SemanticTokensBuilder         builder,
-        ITextDocumentIdentifierParams identifier,
-        CancellationToken             cancellationToken
-    ) {
-        using var typesEnumerator     = RotateEnum(SemanticTokenType.Defaults).GetEnumerator();
-        using var modifiersEnumerator = RotateEnum(SemanticTokenModifier.Defaults).GetEnumerator();
+    protected override Task Tokenize(SemanticTokensBuilder builder, ITextDocumentIdentifierParams identifier, CancellationToken cancellationToken) {
+        Debugger.Launch();
+
+        // using var typesEnumerator     = RotateEnum(SemanticTokenType.Defaults).GetEnumerator();
+        // using var modifiersEnumerator = RotateEnum(SemanticTokenModifier.Defaults).GetEnumerator();
 
         var fsPath = DocumentUri.GetFileSystemPath(identifier)!;
 
-        if (!_interpreter.ModuleResolver.ScriptsByAbsPath.TryGetValue(fsPath, out var script)) {
-            _logger.LogWarning("Could not find script for path {Path}", fsPath);
+        var script = _interpreter.GetScript(identifier);
+        if (script == null) {
+            _logger.LogWarning(
+                "Could not find script for path {Path}, available paths are: {Paths}, Modules: {Modules}",
+                fsPath,
+                _interpreter.ModuleResolver.ScriptsByAbsPath.Keys.Join(", "),
+                _interpreter.ModuleResolver.Modules.Select(m => m.Key + " -> " + m.Value.Name).Join(", ")
+            );
             return Task.CompletedTask;
         }
 
-        var tokens = script.AstData.Lexer.Tokens;
+        var lexer = script.IncrementalLexer.CreateChildWithState(
+            LexerState.CanOutputComments | LexerState.CanOutputNewLines | LexerState.CanOutputWhitespace,
+            false
+        );
 
-        foreach (var token in tokens) {
-
-            typesEnumerator.MoveNext();
-            modifiersEnumerator.MoveNext();
-
-            var r = token.Range;
-
-            SemanticTokenType type;
-            if (token.IsKeyword) {
-                type = SemanticTokenType.Keyword;
-                if(token.IsModuleKeyword || token.IsImportKeyword) {
-                    type = SemanticTokenType.Namespace;
-                } else if (token.IsTypeDeclarationKeyword) {
-                    type = SemanticTokenType.Class;
-                } else if (token.IsFunctionKeyword) {
-                    type = SemanticTokenType.Function;
-                } else if (token.IsCoroutineKeyword) {
-                    type = SemanticTokenType.Method;
-                } 
-            } else if (token.IsIdentifier) {
-                type = SemanticTokenType.Variable;
-            } else if (token.IsNumber) {
-                type = SemanticTokenType.Number;
-            } else if (token.IsString) {
-                type = SemanticTokenType.String;
-            } else {
-                type = SemanticTokenType.Variable;
+        (bool IsValid, SemanticTokenType type) GetSemanticTokenType(Token token) {
+            if (token.IsBlockComment || token.IsLineComment) {
+                return (true, SemanticTokenType.Comment);
             }
 
-            builder.Push(r.StartLine, r.Start, r.Total, type, new SemanticTokenModifier[] {});
+            if (token.IsKeyword) {
+                if (token.IsModuleKeyword || token.IsImportKeyword)
+                    return (true, SemanticTokenType.Namespace);
+                if (token.IsTypeDeclarationKeyword)
+                    return (true, SemanticTokenType.Class);
+                if (token.IsFunctionKeyword)
+                    return (true, SemanticTokenType.Function);
+
+                return (true, SemanticTokenType.Keyword);
+            }
+
+            if (token.IsIdentifier)
+                return (true, SemanticTokenType.Variable);
+            if (token.IsBoolean)
+                return (true, SemanticTokenType.Variable);
+            if (token.IsNumber)
+                return (true, SemanticTokenType.Number);
+            if (token.IsString)
+                return (true, SemanticTokenType.String);
+
+            return (false, SemanticTokenType.Variable);
         }
 
+        foreach (var token in lexer.Tokenize()) {
+            var r = token.Range;
+
+            var (IsValid, type) = GetSemanticTokenType(token);
+            if (!IsValid)
+                continue;
+
+            builder.Push(
+                r.StartLine - 1,
+                r.StartColumn,
+                token.Value.Length,
+                type,
+                new SemanticTokenModifier[] { }
+            );
+        }
+
+
+        // Debugger.Launch();
+
         return Task.CompletedTask;
-
-        /*
-        // you would normally get this from a common source that is managed by current open editor, current active editor, etc.
-        var content = await File.ReadAllTextAsync(DocumentUri.GetFileSystemPath(identifier), cancellationToken).ConfigureAwait(false);
-        await Task.Yield();
-
-        foreach (var (line, text) in content.Split('\n').Select((text, line) => (line, text))) {
-            var parts = text.TrimEnd().Split(';', ' ', '.', '"', '(', ')');
-            var index = 0;
-            foreach (var part in parts) {
-                typesEnumerator.MoveNext();
-                modifiersEnumerator.MoveNext();
-                if (string.IsNullOrWhiteSpace(part)) continue;
-                index = text.IndexOf(part, index, StringComparison.Ordinal);
-                builder.Push(line, index, part.Length, typesEnumerator.Current, modifiersEnumerator.Current);
-            }
-        }*/
     }
 
-    protected override Task<SemanticTokensDocument>
-        GetSemanticTokensDocument(ITextDocumentIdentifierParams @params, CancellationToken cancellationToken) {
+    protected override Task<SemanticTokensDocument> GetSemanticTokensDocument(ITextDocumentIdentifierParams @params, CancellationToken cancellationToken) {
+        Debugger.Launch();
         return Task.FromResult(new SemanticTokensDocument(RegistrationOptions.Legend));
     }
 
+    protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(SemanticTokensCapability capability, ClientCapabilities clientCapabilities) {
+        var opts = new SemanticTokensRegistrationOptions();
 
-    private IEnumerable<T> RotateEnum<T>(IEnumerable<T> values) {
-        while (true) {
-            foreach (var item in values)
-                yield return item;
-        }
+        opts.DocumentSelector = Script.LanguageSelector;
+        opts.Id               = Guid.NewGuid().ToString();
+        opts.Legend = new SemanticTokensLegend {
+            TokenModifiers = capability?.TokenModifiers ?? new(),
+            TokenTypes     = capability?.TokenTypes ?? new(),
+        };
+        opts.Full = new SemanticTokensCapabilityRequestFull {
+            Delta = true,
+        };
+        opts.Range = false;
+
+        return opts;
+    }
+}
+
+public class SemanticTokensFullHandler : SemanticTokensFullHandlerBase
+{
+    private readonly ILogger                          _logger;
+    private readonly Interpreter.Interpreter          _interpreter;
+    private readonly IncrementalInterpreterFileSystem _fs;
+
+    public SemanticTokensFullHandler(
+        ILogger<SemanticTokensHandler>   logger,
+        Interpreter.Interpreter          interpreter,
+        IncrementalInterpreterFileSystem fs
+    ) {
+        _logger      = logger;
+        _interpreter = interpreter;
+        _fs          = fs;
     }
 
-    protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(
-        SemanticTokensCapability capability, ClientCapabilities clientCapabilities
-    ) {
-        return new SemanticTokensRegistrationOptions {
-            DocumentSelector = TextDocumentSelector.ForLanguage(Script.LanguageId),
-            Legend = new SemanticTokensLegend {
-                TokenModifiers = capability.TokenModifiers,
-                TokenTypes     = capability.TokenTypes
-            },
-            Full = new SemanticTokensCapabilityRequestFull {
-                Delta = true
-            },
-            Range = true
+
+    public override async Task<SemanticTokens> Handle(SemanticTokensParams request, CancellationToken cancellationToken) {
+        if (RegistrationOptions == null || RegistrationOptions.Legend == null) {
+            Debugger.Launch();
+        }
+        var document = new SemanticTokensDocument(RegistrationOptions.Legend);
+        // var document = await GetSemanticTokensDocument(request, cancellationToken).ConfigureAwait(false);
+        var builder = document.Create();
+        await Tokenize(builder, request, cancellationToken).ConfigureAwait(false);
+        return builder.Commit().GetSemanticTokens();
+    }
+
+    protected Task Tokenize(SemanticTokensBuilder builder, ITextDocumentIdentifierParams identifier, CancellationToken cancellationToken) {
+        // using var typesEnumerator     = RotateEnum(SemanticTokenType.Defaults).GetEnumerator();
+        // using var modifiersEnumerator = RotateEnum(SemanticTokenModifier.Defaults).GetEnumerator();
+
+        var fsPath = DocumentUri.GetFileSystemPath(identifier)!;
+
+        var script = _interpreter.GetScript(identifier);
+        if (script == null) {
+            _logger.LogWarning(
+                "Could not find script for path {Path}, available paths are: {Paths}, Modules: {Modules}",
+                fsPath,
+                _interpreter.ModuleResolver.ScriptsByAbsPath.Keys.Join(", "),
+                _interpreter.ModuleResolver.Modules.Select(m => m.Key + " -> " + m.Value.Name).Join(", ")
+            );
+            return Task.CompletedTask;
+        }
+
+        var lexer = script.IncrementalLexer.CreateChildWithState(
+            LexerState.CanOutputComments | LexerState.CanOutputNewLines | LexerState.CanOutputWhitespace,
+            false
+        );
+
+        (bool IsValid, SemanticTokenType type) GetSemanticTokenType(Token token) {
+            if (token.IsBlockComment || token.IsLineComment) {
+                return (true, SemanticTokenType.Comment);
+            }
+
+            if (token.IsKeyword) {
+                if (token.IsModuleKeyword || token.IsImportKeyword)
+                    return (true, SemanticTokenType.Namespace);
+                if (token.IsTypeDeclarationKeyword)
+                    return (true, SemanticTokenType.Class);
+                if (token.IsFunctionKeyword)
+                    return (true, SemanticTokenType.Function);
+
+                return (true, SemanticTokenType.Keyword);
+            }
+
+            if (token.IsIdentifier)
+                return (true, SemanticTokenType.Variable);
+            if (token.IsBoolean)
+                return (true, SemanticTokenType.Variable);
+            if (token.IsNumber)
+                return (true, SemanticTokenType.Number);
+            if (token.IsString)
+                return (true, SemanticTokenType.String);
+
+            return (false, SemanticTokenType.Variable);
+        }
+
+        foreach (var token in lexer.Tokenize()) {
+            var r = token.Range;
+
+            var (IsValid, type) = GetSemanticTokenType(token);
+            if (!IsValid)
+                continue;
+
+            builder.Push(
+                r.StartLine - 1,
+                r.StartColumn,
+                token.Value.Length,
+                type,
+                new SemanticTokenModifier[] { }
+            );
+        }
+
+
+        // Debugger.Launch();
+
+        return Task.CompletedTask;
+    }
+
+    protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(SemanticTokensCapability capability, ClientCapabilities clientCapabilities) {
+        var opts = new SemanticTokensRegistrationOptions();
+
+        opts.DocumentSelector = Script.LanguageSelector;
+        // opts.Id               = Guid.NewGuid().ToString();
+
+        opts.Legend = new SemanticTokensLegend {
+            TokenModifiers = capability?.TokenModifiers ?? new(),
+            TokenTypes     = capability?.TokenTypes ?? new(),
         };
+        opts.Full  = true;
+        opts.Range = false;
+
+        return opts;
     }
 }

@@ -1,16 +1,13 @@
 ﻿using System.Collections.Immutable;
 using System.Text;
-using CSScriptingLang.Core.FileSystem;
 using CSScriptingLang.Interpreter.Context;
 using CSScriptingLang.Interpreter.Execution.Expressions;
 using CSScriptingLang.Interpreter.Modules;
 using CSScriptingLang.Lexing;
 using CSScriptingLang.Parsing;
-using CSScriptingLang.Parsing.AST;
-using CSScriptingLang.RuntimeValues;
 using CSScriptingLang.RuntimeValues.Types;
 using CSScriptingLang.RuntimeValues.Values;
-using Engine.Engine.Logging;
+using CSScriptingLang.Core.Logging;
 using PrettyPrompt;
 using PrettyPrompt.Completion;
 using PrettyPrompt.Consoles;
@@ -230,11 +227,11 @@ public class ReplPromptCallbacks : PromptCallbacks
            .ToList();
 
 
-        if (text.EndsWith(".")) {
+        /*if (text.EndsWith(".")) {
             try {
-                var parser = new StandaloneParser(text);
+                var parser = new Parser(text);
                 parser.Parse();
-                var propAccess = parser.Program.Cursor.All.Of<MemberAccessExpression>().ToList().LastOrDefault();
+                var propAccess = parser.Program.AllOfType<MemberAccessExpression>().ToList().LastOrDefault();
                 if (propAccess != null) {
                     var access = ReplProcessor.Interpreter.Execute(propAccess, ReplProcessor.Ctx);
                     if (access.HasValues()) {
@@ -282,7 +279,7 @@ public class ReplPromptCallbacks : PromptCallbacks
                 }
 
             }
-        }
+        }*/
 
 
         return Task.FromResult<IReadOnlyList<CompletionItem>>(
@@ -347,18 +344,17 @@ public class ReplProcessor
 
     public ReplProcessor(Interpreter interpreter) {
         Interpreter = interpreter;
-        Ctx         = Interpreter.GetNewExecContext();
+        Ctx         = Interpreter.GetOrCreateCtx();
 
-        file = Interpreter.FileSystem.AddFile("main.js");
-
-        Interpreter.ModuleResolver.Load(Ctx);
+        file = Interpreter.FileSystem.AddFile("main.vlt");
 
         Ctx = Interpreter.Initialize();
+        Interpreter.Execute(Ctx, file.Path);
 
         Module = Interpreter.ModuleResolver.Get("main");
         Module.IsMainModule = true;
 
-        Script = Module.GetScriptByName("main.js");
+        Script = Module.GetScriptByName("main.vlt");
         
         Interpreter.ModuleResolver.SetMainScript(Script);
     }

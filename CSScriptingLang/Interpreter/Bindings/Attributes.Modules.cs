@@ -12,6 +12,16 @@ public class LanguageModuleBindAttribute : Attribute
     }
 }
 
+[AttributeUsage(AttributeTargets.Class)]
+public class LanguageBindToModuleAttribute : Attribute
+{
+    public string Module { get; set; }
+
+    public LanguageBindToModuleAttribute(string module) {
+        Module = module;
+    }
+}
+
 [AttributeUsage(AttributeTargets.Method)]
 public class LanguageOperatorAttribute : Attribute
 {

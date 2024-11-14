@@ -1,10 +1,14 @@
 ﻿using CSScriptingLang.Parsing.AST;
 using CSScriptingLang.RuntimeValues.Values;
+using SharpX;
 
 namespace CSScriptingLang.Interpreter.Context;
 
 public struct ValueReference
 {
+    public static Maybe<ValueReference> Nothing => Maybe.Nothing<ValueReference>();
+
+    public static implicit operator Maybe<ValueReference>(ValueReference value) => value.ToMaybe();
 
     public enum RefKind
     {
@@ -13,6 +17,8 @@ public struct ValueReference
         MemberAccess,
         IndexAccess,
         Variable,
+
+        Direct,
     }
 
     private ExecContext Ctx { get; set; }
@@ -29,6 +35,13 @@ public struct ValueReference
         Object   = val;
         Key      = null;
     }
+    public ValueReference(ExecContext ctx, Value obj, Value val) {
+        Ctx      = ctx;
+        Variable = null;
+        Object   = obj;
+        Key      = val;
+        Kind     = RefKind.Direct;
+    }
 
     public VariableSymbol Variable { get; set; }
 
@@ -40,6 +53,8 @@ public struct ValueReference
     public Value Value {
         get {
             switch (Kind) {
+                case RefKind.Direct:
+                    return Key;
                 case RefKind.Value:
                     return Object;
                 case RefKind.Variable:
@@ -93,10 +108,16 @@ public struct ValueReference
         _                => throw new InvalidOperationException("Cannot get value from non-variable reference")
     };
 
-    public void SetValue(Value val) {
+    public void SetValue(Value val, bool callOperatorMethod) {
         switch (Kind) {
+            case RefKind.Direct:
             case RefKind.Value:
-                Object.SetValue(val);
+                var obj = (Kind == RefKind.Value) ? Object : Key;
+                if (callOperatorMethod) {
+                    obj.Operator_Assign(val);
+                    return;
+                }
+                obj.SetValue(val);
                 break;
             case RefKind.Variable:
                 Variable.Val = val;
@@ -105,6 +126,8 @@ public struct ValueReference
             case RefKind.IndexAccess:
                 Object.SetMember(Key, val);
                 break;
+
+
         }
     }
 }

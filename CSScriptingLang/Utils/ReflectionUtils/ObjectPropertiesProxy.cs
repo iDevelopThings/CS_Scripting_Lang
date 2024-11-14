@@ -110,11 +110,16 @@ public struct ObjectMember
         }
     }
 
+    public Type DeclaringType => MemberInfo.DeclaringType;
+
     public Type Type => MemberInfo switch {
         PropertyInfo propertyInfo => propertyInfo.PropertyType,
         FieldInfo fieldInfo       => fieldInfo.FieldType,
         _                         => default
     };
+
+    public Type GetGenericTypeDefinition() => Type.GetGenericTypeDefinition();
+    public bool IsGenericType              => Type.IsGenericType;
 
     public string Name => MemberInfo.Name;
 

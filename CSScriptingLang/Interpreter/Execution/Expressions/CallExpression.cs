@@ -1,4 +1,5 @@
 ﻿using CSScriptingLang.Interpreter.Context;
+using CSScriptingLang.Interpreter.Modules;
 using CSScriptingLang.Parsing.AST;
 using CSScriptingLang.RuntimeValues.Values;
 
@@ -20,7 +21,7 @@ public partial class CallExpression : Expression
     public Expression Variable { get; set; }
 
     [VisitableNodeProperty]
-    public TypeParametersListNode TypeParameters { get; set; } = new();
+    public TypeParametersList TypeParameters { get; set; } = new();
 
     public CallExpression() { }
     public CallExpression(IdentifierExpression name, ExpressionListNode arguments = null) {
@@ -40,7 +41,11 @@ public partial class CallExpression : Expression
 
         if (variable is MemberAccessExpression prop) {
             Name = prop.Identifier;
+        } else if(variable is IdentifierExpression ident) {
+            Name = ident.Name;
         }
+        
+        StartToken = variable.StartToken;
     }
 
 
@@ -54,6 +59,18 @@ public partial class CallExpression : Expression
         // var (fn, inst) = TryGetFunctionValue(this, ctx);
         if (fn == null) {
             ctx.LogError(this, $"Function '{Name}' not found");
+            return ctx.ValReference(Value.Null());
+        }
+
+        if (!fn.Is.Function) {
+            if (inst?.DataObject is Script script) {
+                if (script.Declarations.IsExport(Name)) {
+                    ctx.LogError(this, $"Value '{Name}' is not callable. It doesn't appear to be exported?");
+                    return ctx.ValReference(Value.Null());
+                }
+            }
+            
+            ctx.LogError(this, $"Value '{Name}' is not callable. It is of type '{fn.Type}'");
             return ctx.ValReference(Value.Null());
         }
 

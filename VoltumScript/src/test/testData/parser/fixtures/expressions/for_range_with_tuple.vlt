@@ -1,0 +1,4 @@
+var arr = [1, 2, '<bold.blue>surprise</> <yellow>numbah 3</>', 4, 5]
+for (var (i, el) = range arr) {
+     print('index {0} = {1}', i, el);
+}

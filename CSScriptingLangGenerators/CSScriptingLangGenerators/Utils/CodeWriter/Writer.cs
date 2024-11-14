@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -7,43 +8,74 @@ using Microsoft.CodeAnalysis;
 
 namespace CSScriptingLangGenerators.Utils.CodeWriter;
 
-public class Writer
+/*public class WriterDebugView
 {
-    private CodeWriterSettings _settings;
-    private StringBuilder      _sb;
-    private bool               _newLineOnBlockEnd;
+    private readonly Writer v;
+    public WriterDebugView(Writer value) => v = value;
 
+
+}
+
+[DebuggerTypeProxy(typeof(WriterDebugView))]*/
+public class Writer : IDisposable
+{
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+    private CodeWriterSettings _settings;
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+    private StringBuilder _sb;
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+    private bool _newLineOnBlockEnd;
+
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)]
     private int _currentBlockDepth;
+
     public int CurrentBlockDepth {
-        get => _parent?.CurrentBlockDepth ?? _currentBlockDepth;
+        get => parent?.CurrentBlockDepth ?? _currentBlockDepth;
         set {
-            if (_parent != null) {
-                _parent.CurrentBlockDepth = value;
+            if (parent != null) {
+                parent.CurrentBlockDepth = value;
             } else {
                 _currentBlockDepth = value;
             }
         }
     }
 
+
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+    private Stack<YieldBlock> _yieldBlocks = new();
+
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+    private bool _inlineWrite;
+
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+    private bool _inlineWriteSpaceSeparated;
+
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+    private bool _inlineWriteNextWithSpace;
+
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)]
     private int _indent;
     public int Indent {
-        get => _parent?.Indent ?? _indent;
+        get => parent?.Indent ?? _indent;
         set {
-            if (_parent != null) {
-                _parent.Indent = value;
+            if (parent != null) {
+                parent.Indent = value;
             } else {
                 _indent = value;
             }
         }
     }
 
-    public CodeWriterSettings Settings  => _settings;
-    public List<string>       HeadLines { get; set; } = new();
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+    public CodeWriterSettings Settings => _settings;
 
+    public List<string> HeadLines { get; set; } = new();
     public List<string> Imports   { get; set; } = new();
     public string       Namespace { get; set; }
 
-    private Writer        _parent;
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+    protected Writer parent;
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)]
     private List<ISymbol> referencedTypes = new();
 
     public Writer() {
@@ -57,16 +89,22 @@ public class Writer
     }
 
     public Writer(Writer parent) {
+        SetParentWriter(parent);
+    }
+
+    public Writer SetParentWriter(Writer p) {
         if (parent == null) {
             _settings = CodeWriterSettings.CSharpDefault;
             _sb       = new StringBuilder();
-            return;
+            return this;
         }
-
-        _settings = parent._settings;
+        _settings = p._settings;
         _sb       = new StringBuilder();
-        _parent   = parent;
+        _indent   = p.Indent;
+        parent    = p;
+        return this;
     }
+    public void Dispose() { }
     public static Writer Get(Writer parent) {
         return parent ?? new Writer();
     }
@@ -93,6 +131,10 @@ public class Writer
     public Writer WithImports(params string[] imports) {
         Imports.AddRange(imports);
         return this;
+    }
+
+    public bool LastWasNewLine() {
+        return _sb.Length > 0 && _sb[^1] == '\n';
     }
 
     public void WriteRaw(string str = null) {
@@ -130,30 +172,66 @@ public class Writer
         }
     }
 
-    public void Write(string str = null) {
+    public void Write(Writer writer) {
+        Write(writer.ToString());
+    }
+
+    public void Write(string str = null, bool writeNewLine = true) {
         if (_newLineOnBlockEnd) {
             if (str != null)
                 _sb.Append(_settings.NewLine);
-
             _newLineOnBlockEnd = false;
         }
 
-        WriteInternal(str);
+        WriteInternal(str, writeNewLine);
+    }
+
+    public void NewLine() {
+        WriteInternal(null);
+    }
+
+    public UsingHandle InlineWriter(bool spaceSeparated) {
+        _inlineWrite               = true;
+        _inlineWriteSpaceSeparated = spaceSeparated;
+
+        OpenIndent(null, null, newLineAfterBlockEnd: false);
+
+        return new UsingHandle(() => {
+            DecIndent();
+            _inlineWrite               = false;
+            _inlineWriteSpaceSeparated = false;
+        });
     }
 
     public void Write(string str, params string[] strs) {
         Write(str);
         foreach (var s in strs)
-            Write(s);
+            Write(s, false);
+
+        _sb.Append(_settings.NewLine);
     }
 
-    private void WriteInternal(string str = null) {
+    private void WriteInternal(string str = null, bool writeNewLine = true) {
+        if (_inlineWrite) {
+            WriteInline(str);
+            if (_inlineWriteNextWithSpace) {
+                _sb.Append(" ");
+                _inlineWriteNextWithSpace = false;
+            }
+            return;
+        }
         if (str != null) {
-            _sb.Append(GetIndentString());
+            if(LastWasNewLine())
+                _sb.Append(GetIndentString());
             _sb.Append(str);
+        }
+
+        if (writeNewLine)
             _sb.Append(_settings.NewLine);
-        } else {
-            _sb.Append(_settings.NewLine);
+
+        if (_inlineWrite) {
+            if (_inlineWriteSpaceSeparated)
+                _sb.Append(" ");
         }
     }
 
@@ -178,6 +256,8 @@ public class Writer
         _newLineOnBlockEnd = newLineAfterBlockEnd;
     }
 
+    public UsingHandle OpenBlock(bool newLineAfterBlockEnd = false, bool indent = true)
+        => OpenBlock([], newLineAfterBlockEnd, indent);
     public UsingHandle OpenBlock(string[] strs, bool newLineAfterBlockEnd = false, bool indent = true) {
         if (_newLineOnBlockEnd) {
             _sb.Append(_settings.NewLine);
@@ -233,7 +313,26 @@ public class Writer
             first = false;
         }
 
-        Write(temp.ToString());
+        WriteInline(temp.ToString());
+    }
+
+    public void WriteVerticalList<T>(
+        IEnumerable<T>    elements,
+        Action<T, Writer> writeElement,
+        bool              newLineOnLast = false
+    ) {
+
+        elements = elements.ToList();
+
+        for (var i = 0; i < elements.Count(); i++) {
+            var element = elements.ElementAt(i);
+            writeElement(element, this);
+            if (i < elements.Count() - 1 || newLineOnLast) {
+                if (!LastWasNewLine())
+                    NewLine();
+            }
+        }
+
     }
 
     public void Array<T>(IEnumerable<T> elements, Action<T, Writer> writeElement, bool newLineBetweenElements = false) {
@@ -294,10 +393,13 @@ public class Writer
     }
 
     public string GetHeader() {
-        var str = "";
+        var didWrite = false;
+        var str      = "";
 
         if (HeadLines != null) {
             str += string.Join(_settings.NewLine, HeadLines) + _settings.NewLine + _settings.NewLine;
+
+            didWrite |= HeadLines.Count > 0;
         }
 
         var importsList = Imports.Distinct().ToList();
@@ -309,19 +411,25 @@ public class Writer
                    .Distinct(SymbolEqualityComparer.Default)
                    .Select(i => i.ContainingNamespace.ToDisplayString())
             ).Distinct().ToList();
+
+            didWrite |= importsList.Count > 0;
         }
 
         if (importsList.Count > 0) {
             var usings = importsList.Select(i => $"using {i};")
                .Join(_settings.NewLine);
             str += usings + _settings.NewLine + _settings.NewLine;
+
+            didWrite |= usings.Length > 0;
         }
 
         if (Namespace != null) {
             str += $"namespace {Namespace};" + _settings.NewLine + _settings.NewLine;
+
+            didWrite |= Namespace.Length > 0;
         }
 
-        return str;
+        return didWrite ? str : "";
     }
 
     public override string ToString() {
@@ -340,5 +448,561 @@ public class Writer
 
     public void AddReferencedType(ISymbol classSymbol) {
         referencedTypes.Add(classSymbol);
+    }
+
+    public void _(string str = null) {
+        Write(str);
+    }
+    public void ___(string str = null) {
+        Write(str, false);
+    }
+
+    public void __(string str = null) {
+        WriteInline(str);
+    }
+
+    public void _(params string[] strs) {
+        _(strs as IEnumerable<string>);
+    }
+    public void _(params object[] strs) {
+        foreach (var str in strs) {
+            switch (str) {
+                case string s:
+                    Write(s);
+                    break;
+                case IEnumerable<string> ss:
+                    _(ss);
+                    break;
+                default:
+                    Write(str.ToString());
+                    break;
+            }
+        }
+    }
+
+    public void _(IEnumerable<string> strs) {
+        foreach (var str in strs) {
+            Write(str);
+        }
+    }
+
+    public UsingHandle b(params string[] strs) {
+        return OpenBlock(strs, newLineAfterBlockEnd: false);
+    }
+    public UsingHandle bNoIndent(params string[] strs) {
+        return OpenBlock(strs, newLineAfterBlockEnd: false, indent: false);
+    }
+
+    public UsingHandle B(params string[] strs) {
+        return OpenBlock(strs, newLineAfterBlockEnd: true);
+    }
+
+    public UsingHandle i(string begin = null, string end = null) {
+        return OpenIndent(begin, end, newLineAfterBlockEnd: false);
+    }
+
+    public UsingHandle I(string begin = null, string end = null) {
+        return OpenIndent(begin, end, newLineAfterBlockEnd: true);
+    }
+
+
+    public UsingHandle If(string expr) {
+        return B($"if({expr})");
+    }
+
+    public Writer yieldReturn(string str) {
+        if (_yieldBlocks.Count == 0)
+            throw new InvalidOperationException("No yield block to return to.");
+
+        Write($"yield return {str};");
+        _yieldBlocks.Peek().yieldReturnCount++;
+
+        return this;
+    }
+    public Writer yieldReturn(params string[] strs) {
+        if (_yieldBlocks.Count == 0)
+            throw new InvalidOperationException("No yield block to return to.");
+
+        WriteInlineIndented("yield return ");
+        WriteVerticalList(
+            strs,
+            (s, w) => w.___(s),
+            newLineOnLast: false
+        );
+        WriteInline(";");
+        NewLine();
+        
+        _yieldBlocks.Peek().yieldReturnCount++;
+
+        return this;
+    }
+    public Writer yieldReturn(Action<Writer> action) {
+        if (_yieldBlocks.Count == 0)
+            throw new InvalidOperationException("No yield block to return to.");
+
+        var s = new Writer(this);
+        action(s);
+        var str = s.ToString();
+
+        Write($"yield return {str};");
+        _yieldBlocks.Peek().yieldReturnCount++;
+
+        return this;
+    }
+
+    public UsingHandle YieldBlock() {
+        var block = new YieldBlock(this);
+        _yieldBlocks.Push(block);
+
+        return new UsingHandle(() => {
+            _yieldBlocks.Pop();
+            block.Dispose();
+        });
+    }
+
+    public ParametersWriter ParamsWriter(Action<ParametersWriter> action, bool writeAfterAction = true) {
+        var w = new ParametersWriter(this);
+        action(w);
+        if (writeAfterAction)
+            WriteInline(w.ToString());
+        return w;
+    }
+    public ParametersWriter ArgsWriter(Action<ParametersWriter> action, bool writeAfterAction = true) {
+        var w = new ParametersWriter(this, null, true);
+        action(w);
+        if (writeAfterAction)
+            WriteInline(w.ToString());
+        return w;
+    }
+
+    public PropertyWriter PropertyWriter(string name, Action<PropertyWriter> action = null) {
+        var w = new PropertyWriter(this, name);
+        action?.Invoke(w);
+        return w;
+    }
+
+    public MethodWriter MethodWriter(string name, Accessibility accessibility = Accessibility.Public) {
+        return new MethodWriter(this, name).WithAccessibility(accessibility);
+    }
+    public IfChain IfChain() {
+        return new IfChain(this);
+    }
+
+}
+
+public class PropertyWriter : IDisposable
+{
+    private readonly Writer writer;
+
+    private Accessibility Accessibility { get; set; } = Accessibility.Public;
+    private string        Name          { get; set; }
+    private string        Type          { get; set; }
+    private bool          IsStatic      { get; set; }
+
+    public struct PropertyGetterSetterValue
+    {
+        public bool IsGetter;
+        public bool IsSetter;
+
+        public string Value = null;
+
+        public PropertyGetterSetterValue(bool isGetter, bool isSetter) {
+            IsGetter = isGetter;
+            IsSetter = isSetter;
+        }
+        public void Disable() {
+            IsGetter = false;
+            IsSetter = false;
+            Value    = null;
+        }
+    }
+
+    public PropertyGetterSetterValue GetterValue = new(true, false);
+    public PropertyGetterSetterValue SetterValue = new(false, true);
+    public string                    Value       = null;
+
+    public PropertyWriter(Writer parent, string name) {
+        writer = parent;
+        Name   = name;
+    }
+
+    public PropertyWriter WithAccessibility(Accessibility accessibility) {
+        Accessibility = accessibility;
+        return this;
+    }
+    public PropertyWriter WithType(string type) {
+        Type = type;
+        return this;
+    }
+    public PropertyWriter Static(bool val = true) {
+        IsStatic = val;
+        return this;
+    }
+    public PropertyWriter WithGetter(Func<Writer, PropertyGetterSetterValue, PropertyGetterSetterValue> action) {
+        var w = new Writer(writer);
+        GetterValue = action(w, GetterValue);
+
+        var s = w.ToString();
+
+        GetterValue.Value = !string.IsNullOrWhiteSpace(GetterValue.Value)
+            ? s
+            : null;
+
+        return this;
+    }
+    public PropertyWriter WithSetter(Func<Writer, PropertyGetterSetterValue, PropertyGetterSetterValue> action) {
+        var w = new Writer(writer);
+
+        SetterValue = action(w, SetterValue);
+
+        var s = w.ToString();
+
+        SetterValue.Value = !string.IsNullOrWhiteSpace(SetterValue.Value)
+            ? s
+            : null;
+
+        return this;
+    }
+
+    public PropertyWriter WithValue(string v) {
+        if (v != null) {
+            Value = v;
+            GetterValue.Disable();
+            SetterValue.Disable();
+        } else {
+            Value                = null;
+            GetterValue.IsGetter = true;
+            SetterValue.IsSetter = true;
+        }
+        return this;
+    }
+    public void Dispose() {
+        writer.Write();
+
+        writer.___(Accessibility.ToString().ToLower());
+        writer.__(" ");
+        if (IsStatic) {
+            writer.__("static");
+            writer.__(" ");
+        }
+        writer.__(Type);
+        writer.__(" ");
+        writer.__(Name);
+
+        if (Value != null) {
+            writer.__(" = ");
+            writer.__(Value);
+            writer.__(";");
+            writer.NewLine();
+            return;
+        }
+        using (writer.B()) {
+            writer.__(GetterValue is {IsGetter: true, Value: not null}
+                          ? $"get => {GetterValue.Value};"
+                          : "get;");
+
+            writer.__(SetterValue is {IsSetter: true, Value: not null}
+                          ? $"set => {SetterValue.Value};"
+                          : "set;");
+        }
+
+        writer.NewLine();
+        writer.NewLine();
+    }
+}
+
+public class ParametersWriter
+{
+    private readonly Writer writer;
+    private          bool   IsCallArgs { get; set; }
+
+    public struct MethodParameter
+    {
+        public string     Name;
+        public string     Type;
+        public Func<bool> Cond { get; set; }
+    }
+
+    private List<MethodParameter> Parameters { get; set; } = new();
+
+    public ParametersWriter(
+        Writer                parent,
+        List<MethodParameter> parameters = null,
+        bool                  isCallArgs = false
+    ) {
+
+        var settings = new CodeWriterSettings(parent.Settings);
+        settings.NewLineBeforeBlockBegin = false;
+        settings.BlockBegin              = "(";
+        settings.BlockEnd                = ")";
+
+        IsCallArgs = isCallArgs;
+
+        writer = new Writer();
+        writer.SetSettings(settings);
+
+
+        if (parameters != null)
+            Parameters.AddRange(parameters);
+    }
+
+    public ParametersWriter Value(string value) {
+        Parameters.Add(new MethodParameter {
+            Name = value,
+        });
+        return this;
+    }
+    public ParametersWriter Value(Action<Writer> action) {
+        var w = new Writer(writer);
+        action(w);
+        Parameters.Add(new MethodParameter {
+            Name = w.ToString(),
+        });
+        return this;
+    }
+    public ParametersWriter Value(string value, Func<bool> cond) {
+        Parameters.Add(new MethodParameter {
+            Name = value,
+            Cond = cond,
+        });
+        return this;
+    }
+
+    public ParametersWriter Parameter(string name, string type) {
+        Parameters.Add(new MethodParameter {
+            Name = name,
+            Type = type,
+        });
+        return this;
+    }
+    public ParametersWriter Parameter(string name, string type, Func<bool> cond) {
+        Parameters.Add(new MethodParameter {
+            Name = name,
+            Type = type,
+            Cond = cond,
+        });
+        return this;
+    }
+
+    public override string ToString() {
+        writer.WriteInline("(");
+        var pa = Parameters.Where(p => p.Cond == null || p.Cond());
+
+        writer.WriteArray(pa, (p, w) => {
+            w.WriteInline(IsCallArgs ? p.Name : $"{p.Type} {p.Name}");
+        });
+        writer.WriteInline(")");
+
+        return writer.ToString();
+    }
+}
+
+public class MethodWriter : IDisposable
+{
+    private readonly Writer             writer;
+    private          Action<Writer>     writeBody;
+    private readonly CodeWriterSettings prevWriterSettings;
+
+    private Accessibility Accessibility { get; set; } = Accessibility.Public;
+    private string        Name          { get; set; }
+    private string        ReturnType    { get; set; }
+    private bool          IsStatic      { get; set; }
+
+    private ParametersWriter ParametersWriter { get; set; }
+
+    public MethodWriter(
+        Writer parent,
+        string name,
+        bool   staticMethod = false
+    ) {
+        prevWriterSettings = parent.Settings;
+
+        writer = parent;
+
+        var settings = new CodeWriterSettings(parent.Settings);
+        settings.NewLineBeforeBlockBegin = true;
+
+        writer.SetSettings(settings);
+
+        Name             = name;
+        ParametersWriter = new ParametersWriter(writer);
+        IsStatic         = staticMethod;
+    }
+
+    public MethodWriter WithAccessibility(Accessibility accessibility) {
+        Accessibility = accessibility;
+        return this;
+    }
+    public MethodWriter WithReturnType(string returnType) {
+        ReturnType = returnType;
+        return this;
+    }
+
+    public MethodWriter WithParameter(string name, string type) {
+        ParametersWriter.Parameter(name, type);
+        return this;
+    }
+    public MethodWriter WithParameterIf(string name, string type, Func<bool> cond) {
+        ParametersWriter.Parameter(name, type, cond);
+        return this;
+    }
+
+    public MethodWriter Static(bool val = true) {
+        IsStatic = val;
+        return this;
+    }
+
+    public MethodWriter Body(Action<Writer> action) {
+        writeBody = action;
+        return this;
+    }
+
+    public void Dispose() {
+        writer.WriteInlineIndented(Accessibility.ToString().ToLower());
+        writer.WriteInline(" ");
+        if (IsStatic) {
+            writer.WriteInline("static");
+            writer.WriteInline(" ");
+        }
+        writer.WriteInline(ReturnType);
+        writer.WriteInline(" ");
+        writer.WriteInline(Name);
+
+        writer.WriteInline(ParametersWriter.ToString());
+        writer.Write();
+
+        using (writer.B()) {
+            writeBody(writer);
+        }
+
+        writer.SetSettings(prevWriterSettings);
+
+    }
+}
+
+public class YieldBlock : IDisposable
+{
+    public  int    yieldReturnCount;
+    private Writer _writer;
+
+    public YieldBlock(Writer writer) {
+        _writer = writer;
+    }
+
+    public void Dispose() {
+        if (yieldReturnCount == 0)
+            _writer.Write("yield break;");
+    }
+}
+
+public class IfChain : IDisposable
+{
+    private Writer             _writer;
+    public  List<IfChainBlock> Blocks { get; set; } = new();
+
+    public class IfChainBlock
+    {
+        private IfChain _chain;
+
+        public string       _condition;
+        public List<string> _statements = new();
+
+        public enum BlockType
+        {
+            If,
+            ElseIf,
+            Else,
+        }
+
+        public BlockType Type { get; set; } = BlockType.If;
+
+        public IfChainBlock(IfChain chain) {
+            _chain = chain;
+            _chain.Blocks.Add(this);
+        }
+
+        public IfChainBlock Condition(string condition) {
+            _condition = condition;
+            return this;
+        }
+
+        public IfChainBlock Then(Action<Writer> action) {
+            var w = new Writer(_chain._writer);
+            action(w);
+
+            _statements = w.ToString().Split('\n').ToList();
+
+            return this;
+        }
+
+        /*public IfChainBlock Else(Action<Writer> action) {
+            _writer.CloseBracket();
+            _writer.Write("else");
+            _writer.OpenBracket();
+            var w = new Writer(_writer);
+            action(w);
+            _writer.CloseBracket();
+            return this;
+        }*/
+
+    }
+
+    public IfChain(Writer writer) {
+        _writer = writer;
+    }
+
+    public IfChainBlock Block(string condition) => new IfChainBlock(this).Condition(condition);
+
+    public IfChainBlock Condition(string condition) => new IfChainBlock(this).Condition(condition);
+
+    public IfChain OptionalElseIf(bool cond, string condition, Action<IfChainBlock, Writer> action) {
+        if (!cond)
+            return this;
+
+        var b = new IfChainBlock(this) {
+            Type = IfChainBlock.BlockType.ElseIf,
+        };
+
+        b.Condition(condition);
+        b.Then(w => action(b, w));
+
+        return this;
+    }
+
+    public IfChain ElseIf(string condition, Action<Writer> action) {
+        var b = new IfChainBlock(this) {
+            Type = IfChainBlock.BlockType.ElseIf,
+        };
+
+        b.Condition(condition);
+        b.Then(action);
+
+        return this;
+    }
+
+    public IfChain Else(Action<Writer> action) {
+        var b = new IfChainBlock(this) {
+            Type = IfChainBlock.BlockType.Else,
+        };
+
+        b.Then(action);
+
+        return this;
+    }
+
+    public void Dispose() {
+
+        foreach (var block in Blocks) {
+            var type = block.Type switch {
+                IfChainBlock.BlockType.If     => "if",
+                IfChainBlock.BlockType.ElseIf => "else if",
+                IfChainBlock.BlockType.Else   => "else",
+                _                             => throw new ArgumentOutOfRangeException(),
+            };
+            _writer._($"{type}({block._condition})");
+            _writer.OpenBracket();
+            _writer._(block._statements.Select(s => s.Trim()));
+            _writer.CloseBracket();
+        }
     }
 }

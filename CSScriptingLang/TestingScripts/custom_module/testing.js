@@ -1,2 +1,1 @@
-module "custom_module";
 

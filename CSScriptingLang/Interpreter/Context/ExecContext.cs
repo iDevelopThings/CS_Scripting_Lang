@@ -1,14 +1,20 @@
 ﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using CSScriptingLang.Interpreter.Execution.Declaration;
+using CSScriptingLang.Core.Diagnostics;
 using CSScriptingLang.Interpreter.Execution.Expressions;
 using CSScriptingLang.Interpreter.Libraries;
 using CSScriptingLang.Interpreter.Modules;
 using CSScriptingLang.Lexing;
+using CSScriptingLang.Mixins;
 using CSScriptingLang.Parsing.AST;
+using CSScriptingLang.IncrementalParsing.Syntax;
+using CSScriptingLang.IncrementalParsing.Syntax.SyntaxNodes;
 using CSScriptingLang.RuntimeValues.Types;
 using CSScriptingLang.RuntimeValues.Values;
 using CSScriptingLang.Utils;
+using MoreLinq;
+using SharpX;
+using FunctionDeclaration = CSScriptingLang.Interpreter.Execution.Expressions.FunctionDeclaration;
 using ValueType = CSScriptingLang.RuntimeValues.Types.ValueType;
 
 namespace CSScriptingLang.Interpreter.Context;
@@ -29,7 +35,8 @@ public enum ValueEvaluationType
     LValue,
 }
 
-public class ExecContext
+[AddMixin(typeof(DiagnosticLoggingMixin))]
+public partial class ExecContext
 {
     public Interpreter Interpreter { get; set; }
 
@@ -41,23 +48,24 @@ public class ExecContext
     public Dictionary<string, FunctionDeclaration>                     AllFunctions     => Functions.SelectMany(s => s.Table).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
     public ExecTable<string, FunctionDeclaration, FunctionDeclaration> CurrentFunctions => Functions.Peek();
 
-    public Dictionary<(string fqn, string name), (RuntimeType, Value)> Prototypes { get; set; } = new();
-
     public Module         Module         { get; set; }
     public ModuleResolver ModuleResolver => Interpreter.ModuleResolver;
 
-    public Stack<Frame> CallStack        { get; private set; } = new();
-    public Frame        CurrentCallFrame => CallStack.Peek();
+    public Stack<Frame> CallStack { get; private set; } = new();
 
-    public CallExpression Caller { get; set; }
+    public int     frameSize = 0;
+    public Frame[] Frames    = new Frame[250];
+
+    public Frame CurrentCallFrame => Frames[frameSize > 0 ? frameSize - 1 : 0];
+
+    public CallExpression Caller     { get; set; }
+    public CallExpr       CallerExpr { get; set; }
 
     public ValueEvaluationType EvaluationType { get; set; } = ValueEvaluationType.RValue;
 
     public LibraryManager Libraries { get; set; } = new() {
         new StandardLibraries(),
     };
-
-    public Action<ExecContext> OnBeforeExecuteProgram { get; set; }
 
     public event Action<ExecContext, LibraryCollection> OnConfigureLibraries {
         add => Libraries.OnConfigure += value;
@@ -76,10 +84,13 @@ public class ExecContext
         Functions   = ctx.Functions;
         CallStack   = ctx.CallStack;
         Caller      = ctx.Caller;
+        CallerExpr  = ctx.CallerExpr;
+
+        Frames    = ctx.Frames;
+        frameSize = ctx.frameSize;
 
         if (pushScope) {
             PushScope();
-            PushFrame();
         }
     }
 
@@ -89,43 +100,48 @@ public class ExecContext
 
         if (pushScope) {
             PushScope();
-            PushFrame();
         }
     }
 
     public ExecContext(bool pushScope = true) {
         if (pushScope) {
             PushScope();
-            PushFrame();
         }
     }
 
-    public bool           GetVariable(string name, out VariableSymbol symbol) => CurrentVariables.Get(ModulePrefixedName(name), out symbol);
+    public bool GetVariable(string name, out VariableSymbol symbol) {
+        return Variables.Get(ModulePrefixedName(name), out symbol);
+        // return CurrentVariables.Get(ModulePrefixedName(name), out symbol);
+    }
     public VariableSymbol GetVariable(string name) => GetVariable(name, out var symbol) ? symbol : null;
+    public Value GetOrCreateVariable(string name, Func<Value> factory) {
+        if (GetVariable(name, out var symbol))
+            return symbol.Val;
 
-    public virtual Frame PushFrame(
-        CallExpression returnExpression = null,
-        Frame          parent           = null,
-        string         name             = null
-    ) {
-        var frame = new Frame(
-            returnExpression,
-            parent ?? (CallStack.TryPeek(out var p) ? p : null),
-            name
+        var value = factory();
+        CurrentVariables.Set(ModulePrefixedName(name), value);
+
+        return value;
+    }
+
+    public virtual UsingCallbackHandle UsingScope(bool push = true) {
+        if (push)
+            PushScope();
+        return new UsingCallbackHandle(
+            () => {
+                if (push)
+                    PopScope();
+            }
         );
-        CallStack.Push(frame);
-        InterpreterEvents.OnFunctionFramePushed?.Invoke(frame);
-        return frame;
     }
-    public virtual Frame PopFrame() {
-        var frame = CallStack.Pop();
-        InterpreterEvents.OnFunctionFramePopped?.Invoke(frame);
-        return frame;
-    }
+    public UsingCallbackHandle UsingBlockCallbacks(Action onBeforeExecuteBlock = null, Action onAfterExecuteBlock = null) {
+        onBeforeExecuteBlock?.Invoke();
 
-    public virtual UsingCallbackHandle UsingScope() {
-        PushScope();
-        return new UsingCallbackHandle(PopScope);
+        return new UsingCallbackHandle(
+            () => {
+                onAfterExecuteBlock?.Invoke();
+            }
+        );
     }
 
     public virtual void PushScope([CallerMemberName] string name = "", [CallerLineNumber] int line = 0, [CallerFilePath] string file = "") {
@@ -139,27 +155,68 @@ public class ExecContext
     }
 
     public string ModulePrefixedName(string name) {
+        if (Module == null)
+            return name;
+
         return Module.IsMainModule ? name : $"{Module.Name}.{name}";
     }
 
-    public Value MakeFunction(InlineFunctionDeclaration fn, RuntimeType owner = null) {
+    public Value MakeFunction(InlineFunctionDeclaration fn) {
         var closure = new FnClosure(fn);
 
+        void OnBeforeExecuteBlock(FunctionExecContext ctx, Value instance, Value[] arguments) {
+            if (instance != null)
+                ctx.Scope.Set("this", instance);
+
+            for (var i = 0; i < fn.Parameters.Arguments.Count; i++) {
+                var param = fn.Parameters.Arguments[i];
+                var arg   = arguments[i];
+
+                ctx.Scope.Set(param.Name, arg);
+            }
+        }
+
+        if (fn.IsSeq) {
+            closure.Interpreted = (ctx, instance, arguments) => {
+                var enumerable = fn.Body.ExecuteEnumerable(
+                    ctx,
+                    true,
+                    () => OnBeforeExecuteBlock(ctx, instance, arguments)
+                );
+
+                var cEnumerator = enumerable.GetEnumerator();
+
+                var enumerator = Value.Object(ctx);
+                enumerator["current"] = cEnumerator.Current.MatchJust(out var value) ? value : Value.Null();
+                enumerator["moveNext"] = Value.Function(
+                    "moveNext", (_, args) => {
+                        if (cEnumerator.MoveNext()) {
+                            enumerator["current"] = cEnumerator.Current.MatchJust(out var v) ? v : Value.Null();
+                            return true;
+                        }
+
+                        return false;
+                    }
+                );
+                enumerator["dispose"] = Value.Function(
+                    "dispose", (_, args) => {
+                        cEnumerator.Dispose();
+                        return Value.Null();
+                    }
+                );
+
+                return enumerator;
+            };
+
+            return Value.Function(closure);
+        }
+
         closure.Interpreted = (ctx, instance, arguments) => {
-            ctx.Function.Body.Execute(
+
+            fn.Body.Execute(
                 ctx,
                 true,
-                () => {
-                    if (instance != null)
-                        ctx.Scope.Set("this", instance);
-
-                    for (var i = 0; i < ctx.Function.Parameters.Arguments.Count; i++) {
-                        var param = ctx.Function.Parameters.Arguments[i];
-                        var arg   = arguments[i];
-
-                        ctx.Scope.Set(param.Name, arg);
-                    }
-                }
+                () => OnBeforeExecuteBlock(ctx, instance, arguments)
             );
 
             foreach (var val in ctx.ReturnValues) {
@@ -167,165 +224,205 @@ public class ExecContext
                     return val;
             }
 
-            return Value.Null();
+            return null;
+            // throw new FatalInterpreterException("Function did not return a value", fn);
         };
 
         return Value.Function(closure);
     }
-    
-    public (Value value, VariableSymbol symbol) DeclareFunction(InlineFunctionDeclaration fn, RuntimeType owner = null) {
-        var fnValue  = MakeFunction(fn, owner);
-        
+
+    public (Value value, VariableSymbol symbol) DeclareFunction(InlineFunctionDeclaration fn) {
+        var fnValue = MakeFunction(fn);
+
         var fnSymbol = CurrentVariables.Set(ModulePrefixedName(fn.Name), fnValue);
 
         return (fnValue, fnSymbol);
+    }
+    public Value MakeFunction(FunctionDecl fn) {
+        var closure = new FnClosure(fn);
 
-        /*
-        if (fn.TypeReference.IsResolvedOrDefined())
-            return (RuntimeTypeInfo_Function) fn.Type;
+        void OnBeforeExecuteBlock(FunctionExecContext ctx, Value instance, Value[] arguments) {
+            if (instance != null)
+                ctx.Scope.Set("this", instance);
 
-        var declName = ModulePrefixedName(fn.Name);
-
-        if (owner != null) {
-            fn.Parameters.Arguments.Insert(0, new ArgumentDeclarationNode {
-                Name     = "this",
-                TypeName = owner.Name,
-            });
+            foreach (var (i, param) in fn.Arguments.Arguments.Index()) {
+                var arg = arguments[i];
+                ctx.Scope.Set(param.Name, arg);
+            }
         }
 
-        var fnDec = CurrentFunctions.Declare(declName, fn);
+        if (fn.IsSeq) {
+            closure.Interpreted = (ctx, instance, arguments) => {
+                var enumerable = fn.Body.Execute(
+                    ctx,
+                    true,
+                    () => OnBeforeExecuteBlock(ctx, instance, arguments)
+                );
 
-        var type = TypeTable.Current.RegisterFunctionType(declName, fn, owner);
-        type.Parameters.AddRange(fn.Parameters.Arguments.Select(p => {
-            if (!p.IsVariadic)
-                p.Type ??= TypeTable.Current.Get(p.TypeName);
+                var cEnumerator = enumerable.GetEnumerator();
 
-            return new RuntimeTypeInfo_Function.Parameter() {
-                Name       = p.Name,
-                Type       = p.Type,
-                IsVariadic = p.IsVariadic,
+                var enumerator = Value.Object(ctx);
+                enumerator["current"] = cEnumerator.Current.MatchJust(out var value) ? value : Value.Null();
+                enumerator["moveNext"] = Value.Function(
+                    "moveNext", (_, args) => {
+                        if (cEnumerator.MoveNext()) {
+                            enumerator["current"] = cEnumerator.Current.MatchJust(out var v) ? v : Value.Null();
+                            return true;
+                        }
+
+                        return false;
+                    }
+                );
+                enumerator["dispose"] = Value.Function(
+                    "dispose", (_, args) => {
+                        cEnumerator.Dispose();
+                        return Value.Null();
+                    }
+                );
+
+                return enumerator;
             };
-        }));
 
-        fn.TypeReference.SetType(type, Module);
+            return Value.Function(closure);
+        }
 
-        var fnInst = ValueFactory.Function.Make(fnDec);
-        fnInst.Executable = (ctx, args) => {
-            ctx.Interpreter.ExecuteBlock(ctx.Function.Body, ctx, false);
+        closure.Interpreted = (ctx, instance, arguments) => {
+
+            var results = fn.Body.Execute(
+                ctx,
+                true,
+                () => OnBeforeExecuteBlock(ctx, instance, arguments)
+            ).ToList();
 
             foreach (var val in ctx.ReturnValues) {
                 if (val != null)
                     return val;
             }
 
-            return Value.Null();
+            return null;
+            // throw new FatalInterpreterException("Function did not return a value", fn);
         };
 
-        var fnSymb = CurrentVariables.Declare(declName, new VariableSymbol(declName, fnInst));
+        return Value.Function(closure);
+    }
+    public (Value value, VariableSymbol symbol) DeclareFunction(FunctionDecl fn) {
+        var fnValue = MakeFunction(fn);
 
-        return type;*/
+        var fnSymbol = CurrentVariables.Set(ModulePrefixedName(fn.Name), fnValue);
+
+        return (fnValue, fnSymbol);
     }
 
-    public RuntimeTypeInfo_Signal DeclareSignal(SignalDeclarationNode signal) {
-        if (signal.TypeReference.IsResolvedOrDefined())
-            return (RuntimeTypeInfo_Signal) signal.Type;
-
-        var declName = ModulePrefixedName(signal.Name);
-        var type     = TypeTable.Current.RegisterSignalType(declName, signal);
-
-        type.Parameters.AddRange(signal.Parameters.Arguments.Select(p => {
-            p.Type ??= TypeTable.Current.Get(p.TypeName);
-
-            return new RuntimeTypeInfo_Signal.Parameter() {
-                Name = p.Name,
-                Type = p.Type,
-            };
-        }));
-
-        signal.TypeReference.SetType(type, Module);
-
-        return type;
-    }
-
-    public RuntimeType DeclareType(TypeDeclaration declaration) {
-        if (declaration.TypeReference.IsResolvedOrDefined())
-            return declaration.Type;
-
-        var declName = ModulePrefixedName(declaration.Name);
-        var type = new RuntimeTypeInfo_Struct {
-            Name       = declName,
-            LinkedNode = declaration,
-        };
-        TypeTable.Current.RegisterType(type);
-
-        declaration.TypeReference.SetType(type, Module);
-
-        foreach (var member in declaration.Members) {
-            var rtType = TypeTable.TryGet(member.TypeName);
-            type.RegisterField(member.Name, ValueFactory.Make(rtType.GetType()));
-        }
-
-        foreach (var method in declaration.Methods) {
-            DeclareFunction(method, type);
-            type.RegisterField(method.Name, ValueFactory.Function.Make(method));
-        }
-
-        return type;
-    }
-
-    public (ValueType type, Value proto) DeclarePrototype(string name, string fqnName, Value prototype, RuntimeType owner = null) {
-        /*var objType = TypeTable.Current.RegisterObjectType(
-            fqnName,
-            owner,
-            name
-        );
-
-        objType.FQN = fqnName;
-
-        foreach (var pair in prototype.Members) {
-            objType.RegisterField(pair.Key, pair.Value);
-
-        }
-
-        Prototypes[(fqnName, name)] = (objType, prototype);
-
-        return objType;*/
-
-        return TypesTable.RegisterPrototype(name, fqnName, prototype);
-
-    }
 
     public IEnumerable<VariableSymbol> DeclareVariable(VariableDeclarationNode node) {
         foreach (var initializer in node.Initializers) {
             var declName = ModulePrefixedName(initializer.Name);
-            var symb = Variables.Declare(declName, () => new VariableSymbol(declName) {
-                IsBaseDeclaration = true,
-            });
+            var symb = Variables.Declare(
+                declName, () => new VariableSymbol(declName) {
+                    IsBaseDeclaration = true,
+                }
+            );
+            yield return symb;
+        }
+    }
+    public IEnumerable<VariableSymbol> DeclareVariable(VariableDecl node) {
+        foreach (var initializer in node.VarValuePairs) {
+            var declName = ModulePrefixedName(initializer.var);
+            var symb = Variables.Declare(
+                declName, () => new VariableSymbol(declName) {
+                    IsBaseDeclaration = true,
+                }
+            );
             yield return symb;
         }
     }
 
-    public Value Call(Value fn, Value instance, params Value[] args) {
-        var fnContext = new FunctionExecContext(this) {
-            Function = fn.As.Fn().Declaration,
+    public bool TryGetVariable(string name, out VariableSymbol variable) {
+        if (Variables.Get(ModulePrefixedName(name), out variable))
+            return true;
+
+        if (CurrentCallFrame?.TryGetLocal(name, out variable) ?? false)
+            return true;
+
+        variable = null;
+
+        return false;
+    }
+
+    public FunctionExecContext CreateFnExecContext(Value instance = null, FnClosure fn = null) {
+        return new(this) {
+            Function = fn?.Declaration,
+            FnDecl   = fn?.Decl,
             This     = instance,
         };
+    }
 
+    public Value Call(Value fnValue, Value instance, params Value[] args) {
+        var fn = fnValue.As.Fn();
+
+        var fnContext = CreateFnExecContext(instance, fn);
         fnContext.PushScope();
-        fnContext.PushFrame(
+
+        var parentFrame = fn.Frame ?? CurrentCallFrame;
+
+        var frame = new Frame(
             returnExpression: fnContext.Caller,
-            name: fnContext.Function?.Name ?? fn.As.Fn().Name
-        );
+            name: fnContext.Function?.Name ?? fn.Name,
+            parent: parentFrame,
+            depth: (parentFrame?.Depth ?? 0) + 1
+        ) {
+            CallExpression = fnContext.CallerExpr,
+        };
+
+        fn.Frame = frame;
+
+        Frames[frameSize++] = frame;
 
         fnContext.PushTypeArgs();
 
         // Function is native bind if null
-        if (fn.As.Fn().Declaration != null)
-            fnContext.PushCallArgs(instance, args);
+        if (fn.Declaration != null)
+            fnContext.PushCallArgs(frame, instance, args);
+        if (fn.Decl != null)
+            fnContext.PushCallArgs(frame, instance, args);
 
-        var returnValue = fn.As.Fn().Call(fnContext, instance, args);
+        Value returnValue = null;
+        try {
+            // using var _ = TimedScope.Scoped_Print("Function Call: " + fn.Name);
 
-        fnContext.PopFrame();
+            returnValue = fn.Call(fnContext, instance, args);
+        }
+        catch (ReturnException e) {
+            returnValue = e.ReturnValue;
+            fnContext.ReturnValues.Add(returnValue);
+        }
+
+        /*while (true) {
+            try {
+                returnValue = fn.Call(fnContext, instance, args);
+
+                if (fnContext.TailCallExpression != null) {
+                    // If there's a tail call, reset the function and args and continue
+                    var tailCall = fnContext.TailCallExpression;
+
+                    fnValue = tailCall.Variable?.Execute(fnContext) ?? tailCall.Identifier?.Execute(fnContext) ?? fnContext.ValReference(Value.Null());
+                    fn      = fnValue.As.Fn();
+                    args    = tailCall.Arguments.Execute(fnContext).Select(v => v.Value).ToArray();
+
+                    fnContext.TailCallExpression = null; // Clear tail call and re-execute
+                    continue;
+                }
+            }
+            catch (ReturnException e) {
+                returnValue = e.ReturnValue;
+                break;
+            }
+
+            break;
+        }*/
+
+        frameSize--;
+
         fnContext.PopScope();
 
         return returnValue;
@@ -339,9 +436,11 @@ public class ExecContext
         _moduleSwitchStack.Push(Module);
         Module = module;
 
-        return new UsingCallbackHandle(() => {
-            Module = _moduleSwitchStack.Pop();
-        });
+        return new UsingCallbackHandle(
+            () => {
+                Module = _moduleSwitchStack.Pop();
+            }
+        );
     }
 
     public ExecResult EvaluateWithType(ValueEvaluationType type, Func<ExecResult> eval) {
@@ -371,43 +470,64 @@ public class ExecContext
     public UsingCallbackHandle UsingEvaluationMode(ValueEvaluationType type) {
         var old = EvaluationType;
         EvaluationType = type;
-        return new UsingCallbackHandle(() => {
-            EvaluationType = old;
-        });
+        return new UsingCallbackHandle(
+            () => {
+                EvaluationType = old;
+            }
+        );
     }
     /// <summary>
     /// Execute in LValue context(IE; for assignment)
     /// </summary>
     /// <returns></returns>
     [DebuggerStepThrough]
-    public UsingCallbackHandle UsingLValueMode() => UsingEvaluationMode(ValueEvaluationType.LValue);
+    public UsingCallbackHandle UsingLValueMode()
+        => UsingEvaluationMode(ValueEvaluationType.LValue);
     /// <summary>
     /// Execute in RValue context(IE; for reading)
     /// </summary>
     /// <returns></returns>
-    public UsingCallbackHandle UsingRValueMode() => UsingEvaluationMode(ValueEvaluationType.RValue);
+    public UsingCallbackHandle UsingRValueMode()
+        => UsingEvaluationMode(ValueEvaluationType.RValue);
     /// <summary>
     /// Execute in LValue context(IE; for assignment)
     /// </summary>
     /// <param name="eval"></param>
     /// <returns></returns>
     [DebuggerStepThrough]
-    public ValueReference ExecuteLValue(Func<ExecContext, ValueReference> eval) => ExecuteWithType(ValueEvaluationType.LValue, eval);
+    public ValueReference ExecuteLValue(Func<ExecContext, ValueReference> eval)
+        => ExecuteWithType(ValueEvaluationType.LValue, eval);
+    [DebuggerStepThrough]
+    public ValueReference ExecuteLValue(Func<ExecContext, Maybe<ValueReference>> eval)
+        => ExecuteWithType(ValueEvaluationType.LValue, ctx => eval(ctx).Value());
     /// <summary>
     /// Execute in RValue context(IE; for reading)
     /// </summary>
     /// <param name="eval"></param>
     /// <returns></returns>
     [DebuggerStepThrough]
-    public ValueReference ExecuteRValue(Func<ExecContext, ValueReference> eval) => ExecuteWithType(ValueEvaluationType.RValue, eval);
+    public ValueReference ExecuteRValue(Func<ExecContext, ValueReference> eval)
+        => ExecuteWithType(ValueEvaluationType.RValue, eval);
+    [DebuggerStepThrough]
+    public ValueReference ExecuteRValue(Func<ExecContext, Maybe<ValueReference>> eval)
+        => ExecuteWithType(ValueEvaluationType.RValue, ctx => eval(ctx).Value());
 
 
     public UsingCallbackHandle SetCaller(CallExpression node) {
         Caller = node;
-
-        return new UsingCallbackHandle(() => {
-            Caller = null;
-        });
+        return new UsingCallbackHandle(
+            () => {
+                Caller = null;
+            }
+        );
+    }
+    public UsingCallbackHandle SetCaller(CallExpr node) {
+        CallerExpr = node;
+        return new UsingCallbackHandle(
+            () => {
+                CallerExpr = null;
+            }
+        );
     }
 
     public ValueReference VariableAccessReference(VariableSymbol variable) {
@@ -464,22 +584,62 @@ public class ExecContext
         return result;
     }
 
+    public void LogError(BaseNode node, string message, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string member = "")
+        => Diagnostic_Error_Fatal().Message(message).Range(node).Caller(Utils.Caller.FromAttributes(file, line, member)).Report();
 
-    public void LogError(BaseNode node, string message, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string member = "") {
+    public void LogError(SyntaxElement node, string message, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string member = "")
+        => Diagnostic_Error_Fatal().Message(message).Range(node).Caller(Utils.Caller.FromAttributes(file, line, member)).Report();
+
+    public void LogWarning(BaseNode node, string message, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string member = "")
+        => Diagnostic_Warning().Message(message).Range(node).Caller(Utils.Caller.FromAttributes(file, line, member)).Report();
+
+    public void LogWarning(SyntaxElement node, string message, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string member = "")
+        => Diagnostic_Warning().Message(message).Range(node).Caller(Utils.Caller.FromAttributes(file, line, member)).Report();
+
+    /*public void LogError(BaseNode node, string message, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string member = "") {
         ErrorWriter.Configure(node?.GetScript(), file, line, member);
-
         throw new FatalInterpreterException(message, node)
            .WithCaller(Utils.Caller.FromAttributes(file, line, member));
     }
     public void LogWarning(BaseNode node, string message, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string member = "") {
         ErrorWriter.Create(node, file, line, member).LogWarning(message, node);
-    }
+    }*/
 
     public void PushDefer(Expression expression) {
         if (this is not FunctionExecContext fnCtx)
-            throw new FatalInterpreterException("Defer statement outside of function context", expression);
+            LogError(expression, "Defer statement outside of function context");
 
         CurrentCallFrame?.DeferExpressions.Add(expression);
+    }
+
+    public class BreakException : Exception
+    {
+        public int Count { get; set; }
+        public BreakException(BreakException ex) : this(ex.Count - 1) { }
+        public BreakException(int count) {
+            Count = count;
+        }
+    }
+
+    public class ReturnException : BreakException
+    {
+        public ValueReference ReturnValue { get; set; }
+        public ReturnException() : base(1) { }
+        public ReturnException(ValueReference returnValue) : base(1) {
+            ReturnValue = returnValue;
+        }
+    }
+
+    public class ContinueException : Exception { }
+
+    public void Return()                 => throw new ReturnException();
+    public void Return(ValueReference v) => throw new ReturnException(v);
+
+    public void Break(ValueReference count) {
+        throw new BreakException((int) count.Value);
+    }
+    public void Continue() {
+        throw new ContinueException();
     }
 }
 
@@ -489,6 +649,7 @@ public class FunctionExecContext : ExecContext
     public VariableSymbol ThisSymbol { get; set; }
 
     public InlineFunctionDeclaration Function { get; set; }
+    public FunctionDecl              FnDecl   { get; set; }
 
     public List<VariableSymbol> Params { get; set; } = new();
 
@@ -496,13 +657,24 @@ public class FunctionExecContext : ExecContext
 
     public struct TypeParameter
     {
-        public string      Name;
-        public RuntimeType Type;
+        public string Name;
+
+        private ValueType _type;
+
+        public ValueType Type {
+            get => _type ??= TypesTable.GetPrototypeTypeByName(Name);
+            set => _type = value;
+        }
+
+        public override string ToString() {
+            return $"{Name} : {(Type?.Name ?? "null/undefined/unknown type")}";
+        }
     }
 
     public List<TypeParameter> TypeArgs { get; set; } = new();
 
-    public List<Value> ReturnValues { get; set; } = new();
+    public List<Value>    ReturnValues       { get; set; } = new();
+    public CallExpression TailCallExpression { get; set; }
 
     public FunctionExecContext(ExecContext ctx) : base(ctx, false) { }
 
@@ -510,50 +682,87 @@ public class FunctionExecContext : ExecContext
         base.PushScope(name, line, file);
         Scope = CurrentVariables;
     }
-    public Value[] PushCallArgs(Value instance, Value[] args) {
+    public Value[] PushCallArgs(Frame frame, Value instance, Value[] args) {
         if (instance != null) {
             // insert "this" value into argument array
             Array.Resize(ref args, args.Length + 1);
             Array.Copy(args, 0, args, 1, args.Length - 1);
             args[0] = instance;
 
-            Scope.Set("this", instance);
+            frame.Locals["this"] = Scope.Set("this", instance);
         }
 
-        for (var i = 0; i < Function.Parameters.Arguments.Count; i++) {
-            var param = Function.Parameters.Arguments[i];
+        if (Function != null) {
+            for (var i = 0; i < Function.Parameters.Arguments.Count; i++) {
+                var param = Function.Parameters.Arguments[i];
 
-            Value argValue = null;
-            if (args.Length <= i) {
-                if (!param.IsOptional) {
-                    throw new InterpreterRuntimeException($"Missing required argument {param.Name}");
+                Value argValue = null;
+                if (args.Length <= i) {
+                    if (!param.IsOptional) {
+                        throw new InterpreterRuntimeException($"Missing required argument {param.Name}");
+                    }
+
+                    argValue = Value.Null();
+                } else {
+                    argValue = args[i];
                 }
 
-                argValue = Value.Null();
-            } else {
-                argValue = args[i];
+                var symbol = Scope.Set(param.Name, argValue);
+
+                frame.Locals[param.Name] = symbol;
+
+                Params.Add(symbol);
             }
-
-            var symbol = Scope.Set(param.Name, argValue);
-
-            Params.Add(symbol);
         }
+        if (FnDecl != null) {
+            foreach (var (i, param) in FnDecl.Arguments.Arguments.Index()) {
+                Value argValue = null;
+                if (args.Length <= i) {
+                    // if (!param.IsOptional) {
+                    // throw new InterpreterRuntimeException($"Missing required argument {param.Name}");
+                    // }
+
+                    argValue = Value.Null();
+                } else {
+                    argValue = args[i];
+                }
+
+                var symbol = Scope.Set(param.Name, argValue);
+
+                frame.Locals[param.Name] = symbol;
+
+                Params.Add(symbol);
+            }
+        }
+
 
         return args;
     }
 
     public void PushTypeArgs() {
-        if (Caller == null) {
-            throw new InterpreterRuntimeException("FunctionExecContext.PushTypeArgs: CallNode is null");
+        if (Caller != null) {
+            foreach (var typeArg in Caller.TypeParameters) {
+                var type = TypesTable.GetPrototypeTypeByName(typeArg.Name);
+
+                TypeArgs.Add(
+                    new TypeParameter {
+                        Name = typeArg.Name,
+                        Type = type,
+                    }
+                );
+            }
         }
 
-        foreach (var typeArg in Caller.TypeParameters) {
-            var type = TypeTable.Current.Get(typeArg.Name);
-
-            TypeArgs.Add(new TypeParameter {
-                Name = typeArg.Name,
-                Type = type,
-            });
+        if (CallerExpr != null) {
+            foreach (var typeArg in CallerExpr.TypeParams) {
+                var type = TypesTable.GetPrototypeTypeByName(typeArg.Name);
+                TypeArgs.Add(
+                    new TypeParameter {
+                        Name = typeArg.Name,
+                        Type = type,
+                    }
+                );
+            }
         }
     }
 

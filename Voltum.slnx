@@ -1,0 +1,9 @@
+﻿<Solution>
+  <Project Path="CSScriptingLang.BindingsMetaGenerator\CSScriptingLang.BindingsMetaGenerator.csproj" Type="Classic C#" />
+  <Project Path="CSScriptingLang.Common\CSScriptingLang.Common.csproj" Type="Classic C#" />
+  <Project Path="CSScriptingLang.LSP\CSScriptingLang.LSP.csproj" Type="Classic C#" />
+  <Project Path="CSScriptingLangGenerators\CSScriptingLangGenerators.Tests\CSScriptingLangGenerators.Tests.csproj" Type="Classic C#" />
+  <Project Path="CSScriptingLangGenerators\CSScriptingLangGenerators\CSScriptingLangGenerators.csproj" Type="Classic C#" />
+  <Project Path="CSScriptingLang\CSScriptingLang.csproj" Type="Classic C#" />
+  <Project Path="LanguageTests\LanguageTests.csproj" Type="Classic C#" />
+</Solution>

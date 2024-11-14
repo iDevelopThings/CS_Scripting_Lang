@@ -1,7 +1,6 @@
-﻿using CSScriptingLang.Interpreter.Context;
-using CSScriptingLang.Interpreter.Execution.Expressions;
+﻿using System.Diagnostics;
+using CSScriptingLang.Interpreter.Context;
 using CSScriptingLang.Parsing.AST;
-using CSScriptingLang.RuntimeValues.Values;
 
 namespace CSScriptingLang.Interpreter.Execution.Expressions;
 
@@ -18,6 +17,7 @@ public partial class MatchExpression : Expression
 
     public override ValueReference Execute(ExecContext ctx) {
         var exprRefValue = MatchAgainstExpr.Execute(ctx);
+        var exprValue    = exprRefValue.Value;
 
         MatchCaseNode matchingCase = null;
 
@@ -27,7 +27,7 @@ public partial class MatchExpression : Expression
             if (pattern is LiteralPatternNode literalPattern) {
                 try {
                     var literalValue = literalPattern.Literal.Execute(ctx);
-                    if (literalValue.Value.Operator_Equal(exprRefValue)) {
+                    if (literalValue.Value.Operator_Equal(exprValue, true)) {
                         matchingCase = caseNode;
                         break;
                     }
@@ -40,20 +40,20 @@ public partial class MatchExpression : Expression
 
             if (pattern is IdentifierPatternNode variablePattern) {
                 var variableValue = variablePattern.Variable.Execute(ctx);
-                if (variableValue.Value.Operator_Equal(exprRefValue)) {
+                if (variableValue.Value.Operator_Equal(exprValue, true)) {
                     matchingCase = caseNode;
                     break;
                 }
             }
 
             if (pattern is TypePatternNode typePattern) {
-                var type = typePattern.ExpectedType.Get();
+                var type = typePattern.ExpectedType.ResolveType();
                 if (type == null) {
                     ctx.LogError(typePattern, "Failed to get type from type pattern");
                     continue;
                 }
 
-                if (exprRefValue.Value.Type == type.Type) {
+                if (exprValue.Type == type.ValueType.ForType) {
                     matchingCase = caseNode;
                     break;
                 }
@@ -77,12 +77,14 @@ public partial class MatchExpression : Expression
 public abstract partial class BasePatternMatchNode : Expression { }
 
 [ASTNode]
+[DebuggerDisplay($"{{{nameof(ToSimpleDebugString)}(),nq}}")]
 public partial class DefaultPatternNode : BasePatternMatchNode
 {
     public DefaultPatternNode() { }
 }
 
 [ASTNode]
+[DebuggerDisplay($"{{{nameof(ToSimpleDebugString)}(),nq}}")]
 public partial class LiteralPatternNode : BasePatternMatchNode
 {
     [VisitableNodeProperty]
@@ -94,16 +96,20 @@ public partial class LiteralPatternNode : BasePatternMatchNode
 }
 
 [ASTNode]
+[DebuggerDisplay($"{{{nameof(ToSimpleDebugString)}(),nq}}")]
 public partial class TypePatternNode : BasePatternMatchNode
 {
-    public TypeReference ExpectedType { get; set; }
+    [VisitableNodeProperty]
+    public TypeIdentifierExpression ExpectedType { get; set; }
 
-    public TypePatternNode(string typeName) {
-        ExpectedType = new TypeReference(this, typeName);
+    public TypePatternNode(TypeIdentifierExpression expectedType) {
+        ExpectedType = expectedType;
+        EndToken     = expectedType.EndToken;
     }
 }
 
 [ASTNode]
+[DebuggerDisplay($"{{{nameof(ToSimpleDebugString)}(),nq}}")]
 public partial class IdentifierPatternNode : BasePatternMatchNode
 {
     [VisitableNodeProperty]
@@ -117,6 +123,7 @@ public partial class IdentifierPatternNode : BasePatternMatchNode
 }
 
 [ASTNode]
+[DebuggerDisplay($"{{{nameof(ToSimpleDebugString)}(),nq}}")]
 public partial class MatchCaseNode : BaseNode
 {
     [VisitableNodeProperty]

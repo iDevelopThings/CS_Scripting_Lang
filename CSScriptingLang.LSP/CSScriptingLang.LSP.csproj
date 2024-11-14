@@ -7,12 +7,15 @@
         <Nullable>disable</Nullable>
         <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
         <TargetPlatformIdentifier>Windows</TargetPlatformIdentifier>
+        <SuppressNETCoreSdkPreviewMessage>true</SuppressNETCoreSdkPreviewMessage>
+        <NoWarn>NU1901;NU1902;NU1903;NU1904</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
       <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9" />
-      <PackageReference Include="Serilog" Version="4.0.1" />
+      <PackageReference Include="Serilog" Version="4.0.2" />
       <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
+      <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
       <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
       <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
         
@@ -21,5 +24,14 @@
     <ItemGroup>
       <ProjectReference Include="..\CSScriptingLang\CSScriptingLang.csproj" />
     </ItemGroup>
+
+    <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+<!--        <Exec Command="taskkill /IM CSScriptingLang.LSP.exe /F" IgnoreExitCode="true" EchoOff="true" />-->
+        <Exec Command="taskkill /f /im CSScriptingLang.LSP.exe 2>nul &amp;set errorlevel=0" IgnoreExitCode="true" EchoOff="true" />
+    </Target>
+    
+    <!--<Target Name="PostBuild" AfterTargets="PostBuildEvent">
+      <Exec Command="copy $(TargetDir)CSScriptingLang.LSP.exe $(TargetDir)CSScriptingLang.LSP.Temp.exe /Y" />
+    </Target>-->
 
 </Project>

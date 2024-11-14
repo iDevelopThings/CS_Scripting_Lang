@@ -7,105 +7,103 @@ namespace CSScriptingLangGenerators.Bindings;
 
 public partial class BindingsGenerator
 {
-    private static void ClassBindings(GeneratorExecutionContext context, INamedTypeSymbol klass, Writer writer) {
-        var className = klass.GetAttributeArgument<string>(Attributes.Class, klass.Name);
+    private static void ClassBindings(
+        GeneratorExecutionContext context,
+        INamedTypeSymbol          klass,
+        ClassTypeData             classData
+    ) {
+        // var classData = ClassTypeData.ForClassBinding(klass, context, outerWriter);
+        var className = classData.Name;
 
+        var w = classData;
 
-        var qualifier     = $"global::{klass.GetFullyQualifiedName()}";
-        var constructors  = GetConstructors(context, klass);
-        var properties    = GetProperties(context, klass, false).ToList();
-        var methods       = GetMethods(context, klass, false);
-        var staticMethods = GetMethods(context, klass, true);
+        // var qualifier = classData.Qualifier;
+        // var constructors  = GetConstructors(context, klass);
+        // var properties    = GetProperties(context, klass, false).ToList();
+        // var methods       = GetMethods(context, klass, false);
+        // var staticMethods = GetMethods(context, klass, true);
+        // methods = methods.Concat(staticMethods).ToList();
+        // methods = methods.Concat(constructors.Select(c => (c, "#ctor", "__ctor"))).ToList();
+        // var methodTables = MethodData.Build(context, methods);
 
-        methods = methods.Concat(staticMethods).ToList();
+        using (w.B("public sealed partial class Library : ILibrary")) {
 
-        var methodTables = MethodData.Build(context, methods.Concat(constructors.Select(c => (c, "#ctor", "__ctor"))));
+            using (w.B("public IEnumerable<KeyValuePair<string, Value>> GetDefinitions(ExecContext ctx)")) {
+                using var _ = w.YieldBlock();
 
-        using (writer.B("public sealed partial class Library : ILibrary")) {
+                w._("var prototype = Value.Object(ctx);");
 
-            using (writer.B("public IEnumerable<KeyValuePair<string, Value>> GetDefinitions(ExecContext ctx)")) {
+                w._();
 
-                writer._("var prototype = Value.Object();");
+                classData.WritePropertyBindings("prototype");
+                classData.WriteMethodBindings("prototype");
 
-                writer._();
+                w._();
 
-                foreach (var property in properties) {
-                    if (property.GetMethod != null) {
-                        writer._($"prototype[\"get{property.Name}\"] = Value.Function(\"{property.Name}\", {property.Name}__Getter);");
-                    }
+                w._($"TypesTable.DeclareCustomObjectPrototype(ctx, \"{className}\", \"{klass.GetFullyQualifiedName()}\", prototype);");
+                w._();
 
-                    if (property.SetMethod != null) {
-                        writer._($"prototype[\"set{property.Name}\"] = Value.Function(\"{property.Name}\", {property.Name}__Setter);");
-                    }
-                }
+                classData.WriteConstructorDefinition();
 
-                foreach (var table in methodTables) {
-                    writer._($"prototype[\"{table.Identifier}\"] = Value.Function(\"{table.Identifier}\", {table.Identifier}__Dispatch);");
-                }
-
-                writer._();
-
-                writer._($"ctx.DeclarePrototype(\"{className}\", \"{klass.GetFullyQualifiedName()}\", prototype);");
-                writer._();
-
-                if (constructors.Count > 0) {
-                    writer._($"yield return new KeyValuePair<string, Value>(\"{className}\", Value.Function(\"{className}__ctor\", __ctor__Dispatch));");
-                }
-
-                writer._("yield break;");
             }
 
-            writer._();
+            w._();
 
-            foreach (var property in properties) {
+            classData.WritePropertyDefinitions();
+
+            w._();
+
+            classData.WriteMethodDefinitions(true, true);
+
+            /*foreach (var property in properties) {
                 if (property.GetMethod != null) {
-                    using (writer.B($"public static Value {property.Name}__Getter(FunctionExecContext ctx, Value instance, params Value[] args)")) {
+                    using (w.B($"public static Value {property.Name}__Getter(FunctionExecContext ctx, Value instance, params Value[] args)")) {
                         Prologue($"get{property.Name}");
 
-                        using(writer.B("if (args.Length != 0)")) {
-                            writer._($"throw new InterpreterRuntimeException(\"{className}.get{property.Name}: expected 0 arguments\");");
+                        using (w.B("if (args.Length != 0)")) {
+                            w._($"throw new InterpreterRuntimeException(\"{className}.get{property.Name}: expected 0 arguments\");");
                         }
 
-                        writer._($"var value = obj.{property.Name};");
-                        
-                        writer._($"return {ConvertToValue(context, "value", property.Type, property.Property)};"); 
+                        w._($"var value = obj.{property.Name};");
+
+                        w._($"return {ConvertToValue(context, "value", property.Type, property.Property)};");
                     }
                 }
 
                 if (property.SetMethod != null) {
                     var parameter = Parameter.Create(context, property.SetMethod.Parameters[0]);
 
-                    using (writer.B($"public static Value {property.Name}__Setter(FunctionExecContext ctx, Value instance, params Value[] args)")) {
+                    using (w.B($"public static Value {property.Name}__Setter(FunctionExecContext ctx, Value instance, params Value[] args)")) {
 
                         Prologue($"set{property.Name}");
 
-                        using (writer.B($"if (args.Length != 1 || !{CompareArgument(0, parameter)})")) {
-                            writer._($"throw new InterpreterRuntimeException(\"{className}.set{property.Name}: expected 1 argument of type {parameter.TypeName}\");");
+                        using (w.B($"if (args.Length != 1 || !{CompareArgument(0, parameter)})")) {
+                            w._($"throw new InterpreterRuntimeException(\"{className}.set{property.Name}: expected 1 argument of type {parameter.TypeName}\");");
                         }
 
-                        writer._($"obj.{property.Name} = {ConvertFromValue(context, 0, property.Type, property.Property)};");
+                        w._($"obj.{property.Name} = {ConvertFromValue(context, 0, property.Type, property.Property)};");
 
-                        writer._("return Value.Null();");
+                        w._("return Value.Null();");
                     }
 
-                    writer._();
+                    w._();
                 }
-            }
+            }*/
 
-            foreach (var table in methodTables) {
+            /*foreach (var table in methodTables) {
                 var isNormalMethod = table.Name != "#ctor";
 
-                writer._(isNormalMethod
+                w._(isNormalMethod
                              ? $"public static Value {table.Identifier}__Dispatch(FunctionExecContext ctx, Value instance, params Value[] args)"
                              : $"public static Value {table.Identifier}__Dispatch(FunctionExecContext ctx, params Value[] args)");
-                writer.OpenBracket();
+                w.OpenBracket();
 
                 if (isNormalMethod) {
                     Prologue(table.Name);
                 }
 
-                writer._("switch (args.Length)");
-                writer.OpenBracket();
+                w._("switch (args.Length)");
+                w.OpenBracket();
 
                 for (var i = 0; i < table.Methods.Count; i++) {
                     var tableMethods = table.Methods[i];
@@ -113,60 +111,44 @@ public partial class BindingsGenerator
                         continue;
                     }
 
-                    using (writer.B($"case {i}:")) {
+                    using (w.B($"case {i}:")) {
                         var hasTrueType = false;
                         foreach (var method in tableMethods) {
                             var stmt = CompareArguments(method, out var isTrueType, i);
                             if (isTrueType)
                                 hasTrueType = true;
 
-                            using (writer.B($"if ({stmt})")) {
+                            using (w.B($"if ({stmt})")) {
                                 CallMethod(context, writer, "obj", method, i);
                             }
                         }
 
                         if (!hasTrueType)
-                            writer._("break;");
+                            w._("break;");
                     }
                 }
 
-                writer.CloseBracket();
+                w.CloseBracket();
 
                 foreach (var method in table.ParamsMethods) {
-                    using (writer.B($"if (args.Length >= {method.RequiredParameterCount} && {CompareArguments(method)})")) {
+                    using (w.B($"if (args.Length >= {method.RequiredParameterCount} && {CompareArguments(method)})")) {
                         CallMethod(context, writer, "obj", method);
                     }
                 }
 
-                writer._();
+                w._();
                 var errorPrefix  = $"{className}.{table.Name}: ";
                 var errorMessage = GetMethodNotMatchedErrorMessage(errorPrefix, table);
-                writer._($"throw new InterpreterRuntimeException(\"{EscapeForStringLiteral(errorMessage)}\");");
+                w._($"throw new InterpreterRuntimeException(\"{EscapeForStringLiteral(errorMessage)}\");");
 
-                writer.CloseBracket();
-                writer._();
-            }
+                w.CloseBracket();
+                w._();
+            }*/
 
         }
 
-        return;
 
-        void Prologue(string methodName) {
-            using (writer.B("if (instance.Type != RTVT.Object)")) {
-                writer._($"throw new InterpreterRuntimeException(\"{className}.{methodName}: can only be called on an instance of {className}\");");
-            }
+        // outerWriter.Write(w);
 
-            if (klass.HasBaseType(TypeData.Value)) {
-                using (writer.B($"if (instance is not {qualifier} obj)")) {
-                    writer._($"throw new InterpreterRuntimeException(\"{className}.{methodName}: can only be called on an instance of {className}\");");
-                }
-            } else {
-                using (writer.B($"if (instance?.GetUntypedValue() is not {qualifier} obj)")) {
-                    writer._($"throw new InterpreterRuntimeException(\"{className}.{methodName}: can only be called on an instance of {className}\");");
-                }
-            }
-
-            writer._();
-        }
     }
 }

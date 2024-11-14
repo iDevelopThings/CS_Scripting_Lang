@@ -1,0 +1,8 @@
+function main() {
+    // multiplication exprs
+    var placeholder = 1;
+    var value_1 = placeholder * 2;
+    var value_2 = placeholder * 2 * 3;
+    // with grouping/precedence
+    var value_3 = (placeholder * 2) * 3;
+}

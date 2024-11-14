@@ -4,10 +4,8 @@ using CSScriptingLang.Interpreter.Execution.Expressions;
 using CSScriptingLang.Interpreter.Execution.Statements;
 using CSScriptingLang.Lexing;
 using CSScriptingLang.Parsing.AST;
-using CSScriptingLang.RuntimeValues;
+using CSScriptingLang.RuntimeValues.Prototypes;
 using CSScriptingLang.RuntimeValues.Types;
-using CSScriptingLang.RuntimeValues.Values;
-using CSScriptingLang.Utils;
 
 namespace CSScriptingLang.Interpreter.SyntaxAnalysis;
 
@@ -20,13 +18,14 @@ public class TypeAnalyzer
     public ProgramExpression Program { get; set; }
     public ExecContext Ctx     { get; set; }
 
-    public Dictionary<BaseNode, RuntimeType> EvaluatedTypes { get; } = new();
+    public Dictionary<BaseNode, ITypeAlias> EvaluatedTypes { get; } = new();
 
     public TypeAnalyzer() {
-        if (!_initialized) {
-            _initialized = true;
-            SymbolTable.Initialize();
-        }
+        if (_initialized) 
+            return;
+        
+        _initialized = true;
+        SymbolTable.Initialize();
     }
 
     public TypeAnalyzer(ProgramExpression program, ExecContext ctx) {
@@ -44,14 +43,14 @@ public class TypeAnalyzer
         return analyzer;
     }
 
-    private RuntimeType StoreEvaluatedType(BaseNode node, RuntimeType evaluatedType) {
+    private ITypeAlias StoreEvaluatedType(BaseNode node, ITypeAlias evaluatedType) {
         EvaluatedTypes[node] = evaluatedType;
-        node.Type            = evaluatedType;
+        // node.Type            = evaluatedType;
 
         return evaluatedType;
     }
 
-    public static RuntimeType ResolveTypeReference(TypeReference reference) {
+    /*public static ITypeAlias ResolveTypeReference(TypeReference reference) {
         if (reference?.FromNode == null) {
             Instance.LogError(null, "Type reference is null");
             return null;
@@ -82,13 +81,14 @@ public class TypeAnalyzer
 
         Instance.EvaluatedTypes[typeReference.FromNode] = typeReference.Type;
     }
+    */
 
-    public RuntimeType ResolveType(BaseNode node) {
+    public ITypeAlias ResolveType(BaseNode node) {
         if (EvaluatedTypes.TryGetValue(node, out var type)) {
             return type;
         }
 
-        RuntimeType HandleResult(RuntimeType result) {
+        ITypeAlias HandleResult(ITypeAlias result) {
             if (result == null) {
                 LogError(node, $"Failed to resolve type for {node.GetType().Name}");
             }
@@ -114,7 +114,7 @@ public class TypeAnalyzer
         }
     }
 
-    public RuntimeType ResolveBinaryExpression(Expression leftNode, OperatorType op, Expression rightNode) {
+    public ITypeAlias ResolveBinaryExpression(Expression leftNode, OperatorType op, Expression rightNode) {
         var left = ResolveExpressionType(leftNode);
         if (left == null && leftNode != null) {
             LogError(leftNode, "Failed to resolve type for left side of binary expression");
@@ -127,17 +127,19 @@ public class TypeAnalyzer
             return null;
         }
 
+        return null;
+        /*
         var precedenceType = TypeCoercionRegistry.GetHigherPrecedence(left, right);
         if (precedenceType == null) {
             LogError(leftNode, $"Cannot perform operation {op} on {left!.Name} and {right!.Name}");
             return null;
         }
 
-        return precedenceType;
+        return precedenceType;*/
     }
 
 
-    public RuntimeType ResolveExpressionType(Expression expr) {
+    public ITypeAlias ResolveExpressionType(Expression expr) {
         switch (expr) {
 
             case LiteralValueExpression literal:
@@ -159,9 +161,9 @@ public class TypeAnalyzer
         }
     }
 
-    public RuntimeType ResolveLiteralType(LiteralValueExpression node) {
+    public ITypeAlias ResolveLiteralType(LiteralValueExpression node) {
         try {
-            return node.GetRuntimeType();
+            return node.GetTypeAlias();
         }
         catch (FailedToGetRuntimeTypeException e) {
             LogError(node, e.Message);
@@ -169,27 +171,27 @@ public class TypeAnalyzer
         }
     }
 
-    private RuntimeType ResolveVariable(IdentifierExpression variable)
+    private ITypeAlias ResolveVariable(IdentifierExpression variable)
         => SymbolTable.GetVariableType(variable.Name, variable);
 
-    private RuntimeType ResolveFunctionCallType(CallExpression call) {
+    private ITypeAlias ResolveFunctionCallType(CallExpression call) {
         var returnType = SymbolTable.GetFunctionReturnType(call.Name, call);
         if (returnType != null)
             return returnType;
 
         if (Ctx.Functions.Get(call.Name, out var function)) {
             if (function.IsNative) {
-                return StaticTypes.Null;
+                return TypeAlias<UnitPrototype>.Get();
             }
 
-            return function.ReturnType.Type;
+            return function.ReturnType.ResolveType();
         }
 
         LogError(call, $"Function {call.Name} not found");
         return null;
     }
 
-    private RuntimeType ProcessDeclaration(IDeclarationNode declarationInterface) {
+    private ITypeAlias ProcessDeclaration(IDeclarationNode declarationInterface) {
         var declaration = (declarationInterface as BaseNode)!;
 
         switch (declaration) {
@@ -199,7 +201,7 @@ public class TypeAnalyzer
             case FunctionDeclaration function:
                 return ProcessFunctionDeclaration(function);
 
-            // case SignalDeclarationNode signal:
+            // case SignalDeclaration signal:
             // return ProcessSignalDeclaration(signal);
 
             default:
@@ -208,7 +210,7 @@ public class TypeAnalyzer
         }
     }
 
-    private RuntimeType ProcessVariableDeclaration(VariableDeclarationNode node) {
+    private ITypeAlias ProcessVariableDeclaration(VariableDeclarationNode node) {
         foreach (var initializer in node.Initializers) {
             switch (initializer.Val) {
                 case LiteralValueExpression literal: {
@@ -235,19 +237,19 @@ public class TypeAnalyzer
         return null;
     }
 
-    private RuntimeType ProcessFunctionDeclaration(FunctionDeclaration node) {
+    private ITypeAlias ProcessFunctionDeclaration(FunctionDeclaration node) {
         using var _ = SymbolTable.UsingScope();
 
-        var returnType = node.ReturnType.Get();
+        var returnType = node.ReturnType.ResolveType();
         SymbolTable.DefineFunction(node.Name, returnType);
 
         var (returnNode, returnStatementType) = ProcessBlock(node.Body, false);
         if (returnStatementType != returnType) {
-            if (returnType == null) {
-                node.ReturnType.SetType(returnStatementType, null, false);
-            }
+            // if (returnType == null) {
+            //     node.ReturnType.SetType(returnStatementType, null, false);
+            // }
 
-            if (returnStatementType != node.ReturnType.Get()) {
+            if (returnStatementType != node.ReturnType.ResolveType()) {
                 LogError(returnNode, $"Expected return type {returnType.Name}, got {returnStatementType.Name}");
             }
         }
@@ -255,16 +257,16 @@ public class TypeAnalyzer
         return returnType;
     }
 
-    private RuntimeType ProcessSignalDeclaration(SignalDeclarationNode node) {
+    private ITypeAlias ProcessSignalDeclaration(SignalDeclaration node) {
         return null;
     }
-    private (ReturnStatement returnNode, RuntimeType returnStatementType) ProcessBlock(BlockExpression node, bool pushScope = true) {
+    private (ReturnStatement returnNode, ITypeAlias returnStatementType) ProcessBlock(BlockExpression node, bool pushScope = true) {
         if (pushScope) {
             SymbolTable.PushScope();
         }
 
         ReturnStatement returnNode          = null;
-        RuntimeType         returnStatementType = null;
+        ITypeAlias         returnStatementType = null;
 
         foreach (var statement in node) {
             var t = ResolveType(statement);
@@ -282,7 +284,7 @@ public class TypeAnalyzer
         return (returnNode, returnStatementType);
     }
 
-    /*public RuntimeType EvaluateExpression(BaseNode node) {
+    /*public ITypeAlias EvaluateExpression(BaseNode node) {
         if (EvaluatedTypes.TryGetValue(node, out var expression)) {
             return expression;
         }
@@ -291,11 +293,11 @@ public class TypeAnalyzer
             throw new Exception($"Expected expression node, got {node.GetType().Name}");
         }
 
-        RuntimeType evaluatedType = null;
+        ITypeAlias evaluatedType = null;
 
         switch (node) {
             case LiteralValueNode literal: {
-                evaluatedType = literal.GetRuntimeType();
+                evaluatedType = literal.GetITypeAlias();
                 break;
             }
             case VariableNode variable: {
@@ -309,9 +311,9 @@ public class TypeAnalyzer
                 if (variable.Object != null) {
                     var objType = EvaluateExpression(variable.Object);
 
-                    if (objType is RuntimeTypeInfo_Object obj) {
+                    if (objType is ITypeAliasInfo_Object obj) {
                         if (obj.Fields.TryGetValue(variable.Name, out var field)) {
-                            return StoreEvaluatedType(node, field.ValueConstructor().RuntimeType);
+                            return StoreEvaluatedType(node, field.ValueConstructor().ITypeAlias);
                         }
 
                         LogError(node, $"Field {variable.Name} not found in object {obj.Name}");

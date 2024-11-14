@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using CSScriptingLang.Core.Diagnostics;
 using CSScriptingLang.Interpreter.Context;
 using CSScriptingLang.Interpreter.Coroutines;
 using CSScriptingLang.Interpreter.Modules;
@@ -8,154 +9,13 @@ using CSScriptingLang.Parsing.AST;
 using CSScriptingLang.Utils;
 using CSScriptingLang.RuntimeValues.Types;
 using CSScriptingLang.RuntimeValues.Values;
-using Engine.Engine.Logging;
+using CSScriptingLang.Core.Logging;
+using CSScriptingLang.Mixins;
+using CSScriptingLang.IncrementalParsing.Syntax;
 using SharpX;
 using SharpX.Extensions;
 
 namespace CSScriptingLang.Interpreter;
-
-public interface IScopedValueStack
-{
-    public IEnumerable<object> AllValues { get; }
-    public void                Clear();
-}
-
-public class ScopedValueStack : Stack<object>
-{
-    public object Current => Count > 0 ? Peek() : default;
-
-    public UsingCallbackHandle Using(object value) {
-        Push(value);
-
-        return new UsingCallbackHandle(() => {
-            if (TryPeek(out var peeked) && peeked.Equals(value)) {
-                Pop();
-            }
-        }, value);
-    }
-}
-
-public class ScopedValueStack<T> : Stack<T>, IScopedValueStack
-{
-    public static ScopedValueStack<T> Global = new();
-
-    public IEnumerable<object> AllValues => this.ToArray().Cast<object>();
-
-    // private Stack<UsingCallbackHandle> _handles = new();
-
-    public T Current => Count > 0 ? Peek() : default;
-
-    public ScopedValueStack() {
-        ValueStackContainer.Register(this, typeof(T));
-    }
-
-    /*
-    public new void Push(T item) {
-        base.Push(item);
-    }
-
-    public new T Pop() {
-        if(_handles.Count > 0) {
-            var handle = _handles.Peek();
-            if(handle.Value is T value) {
-                _handles.Pop();
-                return value;
-            }
-        }
-
-        return base.Pop();
-    }
-    public bool TryPop([MaybeNullWhen(false)] out T result) {
-        if(_handles.Count > 0) {
-            var handle = _handles.Peek();
-            if(handle.Value is T value) {
-                _handles.Pop();
-                result = value;
-                return true;
-            }
-        }
-
-        result = default;
-        return base.TryPop(out result);
-    }
-    */
-
-    public UsingCallbackHandle Using(T value) {
-        Push(value);
-
-        return new UsingCallbackHandle(() => {
-            if (TryPeek(out var peeked) && peeked.Equals(value)) {
-                Pop();
-            }
-        }, value);
-        // var handle = new UsingCallbackHandle(value, () => Pop());
-        // _handles.Push(handle);
-        // return handle;
-    }
-}
-
-public class ValueStackContainer
-{
-    public static Dictionary<Type, IScopedValueStack> ExecutionScopeStacks = new();
-    public static void Register<T>(ScopedValueStack<T> stack, Type type) {
-        ExecutionScopeStacks[type] = stack;
-    }
-
-    public static IEnumerable<KeyValuePair<Type, object>> AllValues {
-        get {
-            foreach (var stack in ExecutionScopeStacks) {
-                foreach (var value in stack.Value.AllValues) {
-                    yield return new KeyValuePair<Type, object>(stack.Key, value);
-                }
-            }
-        }
-    }
-
-    public static void ClearAll() {
-        foreach (var stack in ExecutionScopeStacks.Values) {
-            stack.Clear();
-        }
-    }
-
-    public static void Push<T>(T value) {
-        ScopedValueStack<T>.Global.Push(value);
-    }
-
-    public static T Pop<T>() {
-        return ScopedValueStack<T>.Global.Pop();
-    }
-
-    public static T Pop<T>(T value) {
-        return ScopedValueStack<T>.Global.Pop();
-    }
-    public static T Current<T>() {
-        return ScopedValueStack<T>.Global.Current;
-    }
-
-    public static UsingCallbackHandle Using<T>(T value) {
-        return ScopedValueStack<T>.Global.Using(value);
-    }
-
-    public static void Clear<T>() {
-        ScopedValueStack<T>.Global.Clear();
-    }
-
-    public static bool Contains<T>(T value) {
-        return ScopedValueStack<T>.Global.Contains(value);
-    }
-
-    public static T Peek<T>() {
-        return ScopedValueStack<T>.Global.Peek();
-    }
-
-    public static T[] ToArray<T>() {
-        return ScopedValueStack<T>.Global.ToArray();
-    }
-
-    public static int Count<T>() {
-        return ScopedValueStack<T>.Global.Count;
-    }
-}
 
 public struct ExecResult
 {
@@ -373,6 +233,7 @@ public struct ExecResult
 
 }
 
+[AddMixin(typeof(DiagnosticLoggingMixin))]
 public partial class Interpreter
 {
     public static Logger Logger = Logs.Get<Interpreter>(LogLevel.Debug);
@@ -381,12 +242,12 @@ public partial class Interpreter
        .SetColorFn(n => n.BoldBrightBlue())
        .SetName("Interpreter");
 
-    public TypeTable             TypeTable  => TypeTable.Current;
     public InterpreterFileSystem FileSystem { get; set; }
 
     public ModuleResolver ModuleResolver { get; set; }
 
     public Module Module { get; set; }
+    public Script Script { get; set; }
 
     public Scheduler Scheduler { get; set; }
 
@@ -399,28 +260,37 @@ public partial class Interpreter
         r += value;
         return r;
     }
-    
+
     [DebuggerStepThrough]
     private ExecResult NewResult(Maybe<ValueReference> value) {
-        if(value.MatchJust(out var reference)) {
+        if (value.MatchJust(out var reference)) {
             return NewResult(reference);
         }
         return NewResult();
     }
-    
+
     [DebuggerStepThrough]
     private ExecResult NewResult(IEnumerable<Maybe<ValueReference>> value) {
         var result = NewResult();
-        value.ForEach(v => {
-            if (v.MatchJust(out var reference)) {
-                result += reference;
+        value.ForEach(
+            v => {
+                if (v.MatchJust(out var reference)) {
+                    result += reference;
+                }
             }
-        });
+        );
         return result;
     }
 
+    public void LogError(BaseNode node, string message, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string member = "") {
+        Diagnostic_Error_Fatal().Message(message).Range(node).Caller(Caller.FromAttributes(file, line, member)).Report();
+    }
 
-    private void LogError(BaseNode node, string message, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string member = "") {
+    public void LogWarning(BaseNode node, string message, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string member = "") {
+        Diagnostic_Warning().Message(message).Range(node).Caller(Caller.FromAttributes(file, line, member)).Report();
+    }
+
+    /*private void LogError(BaseNode node, string message, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string member = "") {
         ErrorWriter.Configure(node?.GetScript(), file, line, member);
 
         throw new FatalInterpreterException(message, node)
@@ -428,5 +298,5 @@ public partial class Interpreter
     }
     private void LogWarning(BaseNode node, string message, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string member = "") {
         ErrorWriter.Create(node, file, line, member).LogWarning(message, node);
-    }
+    }*/
 }

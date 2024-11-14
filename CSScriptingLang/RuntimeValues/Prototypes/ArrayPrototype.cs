@@ -6,7 +6,8 @@ using CSScriptingLang.RuntimeValues.Values;
 
 namespace CSScriptingLang.RuntimeValues.Prototypes;
 
-[LanguagePrototype("Array")]
+[LanguagePrototype("Array", RTVT.Array, typeof(ValuePrototype))]
+[LanguageBindToModule("Prototypes")]
 [PrototypeBoot(8)]
 public partial class ArrayPrototype : Prototype<ArrayPrototype>
 {
@@ -19,7 +20,10 @@ public partial class ArrayPrototype : Prototype<ArrayPrototype>
 
     public override ZeroValueConstructor GetZeroValue() => Value.Array;
 
-    public ArrayPrototype() : base(RTVT.Array, PrototypeObject.Build, ValuePrototype.Instance) { }
+    public ArrayPrototype(ExecContext ctx) : base(RTVT.Array, ctx) {
+        Ty    = Types.Ty.Array();
+        Proto = Builder.Build(this, ctx, ValuePrototype.Instance, Ty);
+    }
 
     [LanguageInstanceGetterFunction("length")]
     public static int GetLength(ExecContext ctx, [LanguageInstance] Value inst) {
@@ -68,4 +72,27 @@ public partial class ArrayPrototype : Prototype<ArrayPrototype>
         return inst.As.Array().Count;
     }
 
+    [LanguageFunction]
+    public static Value GetEnumerator(FunctionExecContext ctx, [LanguageInstance] Value inst) {
+        inst.Is.ThrowIfNot(RTVT.Array);
+
+        var value = inst.As.Array();
+
+        var enumerator = Value.Object(ctx);
+        var i          = 0;
+
+        enumerator["current"] = Value.Null();
+        enumerator["moveNext"] = Value.Function("moveNext", (_, args) => {
+            if (i >= value.Count) {
+                return false;
+            }
+
+            enumerator["current"] = value[i++];
+            return true;
+        });
+        
+        enumerator["dispose"] = Value.Function("dispose", (_, args) => Value.Null());
+        
+        return enumerator;
+    }
 }

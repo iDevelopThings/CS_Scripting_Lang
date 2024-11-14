@@ -1,0 +1,5 @@
+var body = req.getBody<TestJsonRequest>()
+
+function main() {
+    var body = req.getBody<TestJsonRequest>()
+}

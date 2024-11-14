@@ -1,5 +1,8 @@
 ﻿using CSScriptingLang.Interpreter.Context;
+using CSScriptingLang.Interpreter.Modules;
 using CSScriptingLang.Parsing.AST;
+using CSScriptingLang.RuntimeValues.Prototypes;
+using CSScriptingLang.RuntimeValues.Prototypes.Types;
 using CSScriptingLang.RuntimeValues.Types;
 using CSScriptingLang.RuntimeValues.Values;
 
@@ -21,9 +24,10 @@ public partial class BooleanExpression : LiteralValueExpression
     
     public BooleanExpression(bool value) : base(value) { }
 
-    public override string ToString(int indent = 0) {
-        return $"{new string(' ', indent)}{GetType().Name}: {NativeValue}";
+    public override ITypeAlias GetTypeAlias() => TypeAlias<BooleanPrototype>.Get();
+    
+    
+    public override IEnumerable<Ty> ResolveTypes(ExecContext ctx, DefinitionSymbol symbol) {
+        yield return TypeAlias<BooleanPrototype>.Get().Ty;
     }
-
-    public override RuntimeType GetRuntimeType() => StaticTypes.Boolean;
 }

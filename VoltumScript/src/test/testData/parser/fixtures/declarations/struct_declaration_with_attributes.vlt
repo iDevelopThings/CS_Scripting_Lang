@@ -1,0 +1,15 @@
+
+type TestJsonRequest struct {
+    [Jsonable("message")]
+    Message string
+    [Jsonable("number")]
+    Number int
+    [Jsonable("BoolVal")]
+    Bool bool
+    [Jsonable("fromString")]
+    [SomethingElse]
+    [SomethingElse()]
+    FromString int
+    
+    Data Array<object>
+}

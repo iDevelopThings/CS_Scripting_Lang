@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Reflection.Metadata;
 using System.Text;
 using CSScriptingLangGenerators.Utils;
 using CSScriptingLangGenerators.Utils.CodeWriter;
@@ -28,44 +25,132 @@ public partial class BindingsGenerator : ISourceGenerator
         }
 
         try {
-            if (!TypeData.Initialize(context)) {
+            if (!TypeData.Initialize(context.Compilation, context.ReportDiagnostic)) {
                 return;
             }
+
+            TypeData.WrappableClasses = syntaxReceiver.WrappableClasses;
 
             foreach (var location in syntaxReceiver.MissingPartials) {
                 context.ReportDiagnostic(Diagnostic.Create(Diagnostics.BoundClassesMustBePartial, location));
             }
 
-            foreach (var prototype in syntaxReceiver.Prototypes) {
-                if (prototype.Arity != 0) {
-                    context.ReportDiagnostic(Diagnostic.Create(Diagnostics.CannotBindGeneric, prototype.Locations.First()));
-                    continue;
+            var hasErrors = false;
+            foreach (var (symbol, type) in syntaxReceiver.AllTypes) {
+                if (symbol.Arity != 0) {
+                    context.ReportDiagnostic(Diagnostic.Create(Diagnostics.CannotBindGeneric, symbol.Locations.First()));
+                    hasErrors = true;
                 }
-
-                context.AddSource($"{prototype.GetFullyQualifiedName()}.Prototype.g.cs", GenerateWith(context, prototype, PrototypeBindings));
+                if (type == BindingsSyntaxReceiver.SymbolType.Class && symbol.IsStatic) {
+                    context.ReportDiagnostic(Diagnostic.Create(Diagnostics.ClassesCannotBeStatic, symbol.Locations.First()));
+                    hasErrors = true;
+                }
             }
 
-            foreach (var module in syntaxReceiver.Modules) {
-                if (module.Arity != 0) {
-                    context.ReportDiagnostic(Diagnostic.Create(Diagnostics.CannotBindGeneric, module.Locations.First()));
-                    continue;
-                }
-
-                context.AddSource($"{module.GetFullyQualifiedName()}.Module.g.cs", GenerateWith(context, module, ModuleBindings));
+            if (hasErrors) {
+                return;
             }
 
-            foreach (var klass in syntaxReceiver.Classes) {
-                if (klass.Arity != 0) {
-                    context.ReportDiagnostic(Diagnostic.Create(Diagnostics.CannotBindGeneric, klass.Locations.First()));
+            TypeData.Modules = syntaxReceiver.Modules
+               .Select(m => ModuleTypeData.ForModuleBinding(m, context, new Writer()))
+               .ToHashSet();
+            TypeData.AllTypeMeta.AddRange(TypeData.Modules.Select(m => m.Meta).ToList());
+
+            TypeData.Classes = syntaxReceiver.Classes
+               .Select(c => ClassTypeData.ForClassBinding(c, context, new Writer()))
+               .ToHashSet();
+            TypeData.AllTypeMeta.AddRange(TypeData.Classes.Select(c => c.Meta).ToList());
+
+            TypeData.Prototypes = syntaxReceiver.Prototypes
+               .Select(c => PrototypeTypeData.ForPrototypeBinding(c, context, new Writer()))
+               .ToHashSet();
+            TypeData.AllTypeMeta.AddRange(TypeData.Prototypes.Select(c => c.Meta).ToList());
+
+            var allClassesAndProtos = TypeData.AllTypeMeta
+               .Where(m => {
+                    if (m.Kind is not (TypeMetaKind.Class or TypeMetaKind.Prototype))
+                        return false;
+                    if (string.IsNullOrEmpty(m.Module))
+                        return false;
+                    return true;
+                }).ToList();
+
+            foreach (var meta in allClassesAndProtos) {
+                TypeMeta_Module module = TypeData.Modules
+                   .Select(m => m.Meta as TypeMeta_Module)
+                   .Concat(TypeData.AdditionalModuleTypeMeta)
+                   .FirstOrDefault(m => m!.Name == meta.Module);
+
+                if (module == null) {
+                    module = new TypeMeta_Module() {
+                        Name = meta.Module,
+                        Kind = TypeMetaKind.Module,
+                    };
+                    TypeData.AdditionalModuleTypeMeta.Add(module);
+                    TypeData.AllTypeMeta.Add(module);
+                }
+            }
+
+            var allModulesMeta = TypeData.Modules
+               .Select(m => m.Meta as TypeMeta_Module)
+               .Concat(TypeData.AdditionalModuleTypeMeta)
+               .ToList();
+
+            var toRemove = new HashSet<TypeMeta_ClassBased>();
+            foreach (var typeMeta in TypeData.AllTypeMeta) {
+                if (typeMeta.Kind == TypeMetaKind.Module) {
+                    continue;
+                }
+                if (string.IsNullOrEmpty(typeMeta.Module)) {
                     continue;
                 }
 
-                if (klass.IsStatic) {
-                    context.ReportDiagnostic(Diagnostic.Create(Diagnostics.ClassesCannotBeStatic, klass.Locations.First()));
-                    continue;
+                TypeMeta_Module module = allModulesMeta.FirstOrDefault(m => m!.Name == typeMeta.Module);
+
+                if (module == null) {
+                    throw new Exception($"Module '{typeMeta.Module}' not found for class '{typeMeta.Name}', available modules: {TypeData.Modules.Select(m => m.Meta.Name).Join(", ")}");
                 }
 
-                context.AddSource($"{klass.GetFullyQualifiedName()}.Class.g.cs", GenerateWith(context, klass, ClassBindings));
+                if (typeMeta.Kind == TypeMetaKind.Class) {
+                    module.Classes.Add(typeMeta);
+                    toRemove.Add(typeMeta);
+                }
+                if (typeMeta.Kind == TypeMetaKind.Prototype) {
+                    module.Prototypes.Add(typeMeta);
+                    toRemove.Add(typeMeta);
+                }
+            }
+
+            foreach (var meta in toRemove) {
+                TypeData.AllTypeMeta.Remove(meta);
+            }
+
+            foreach (var module in TypeData.Modules) {
+                context.AddSource(
+                    $"{module.GetFullyQualifiedName()}.Module.g.cs",
+                    GenerateWith(
+                        context, module.Symbol, module,
+                        (executionContext, symbol, data) => ModuleBindings(executionContext, symbol, (ModuleTypeData) data)
+                    )
+                );
+            }
+
+            foreach (var klass in TypeData.Classes) {
+                context.AddSource(
+                    $"{klass.GetFullyQualifiedName()}.Class.g.cs",
+                    GenerateWith(context, klass.Symbol, klass, ClassBindings)
+                );
+            }
+
+            foreach (var module in TypeData.Prototypes) {
+                context.AddSource(
+                    $"{module.GetFullyQualifiedName()}.Prototype.g.cs",
+                    GenerateWith(
+                        context, module.Symbol, module,
+                        (executionContext, symbol, data) => PrototypeBindings(executionContext, symbol, (PrototypeTypeData) data)
+                        // (executionContext, symbol, data) => PrototypeBindingsOld(executionContext, symbol, (PrototypeTypeData) data)
+                    )
+                );
             }
         }
         catch (Exception e) {
@@ -135,36 +220,6 @@ public partial class BindingsGenerator : ISourceGenerator
         writer._("return Value.Null();");
     }
 
-    private static string BindArguments(GeneratorExecutionContext context, Method method, int argCount) {
-        var valueIdx = 0;
-        var args     = new List<string>();
-        foreach (var param in method.Parameters) {
-            if (valueIdx >= argCount && param.Type == ParameterType.Value) {
-                continue;
-            }
-
-            args.Add(BindArgument(context, valueIdx, param));
-
-            if (param.Type == ParameterType.Value) {
-                valueIdx++;
-            }
-        }
-
-        return args.Join(", \n");
-    }
-
-    private static string BindArgument(GeneratorExecutionContext context, int i, Parameter parameter) {
-        return parameter.Type switch {
-            ParameterType.Unsupported => $"default /* unsupported type {parameter.Info.Type.GetFullyQualifiedName()} */",
-            ParameterType.Value       => ConvertFromValue(context, i, parameter.Info.Type, parameter.Info),
-            ParameterType.Params      => $"args[{i}..]",
-            ParameterType.ExecCtx     => "ctx",
-            ParameterType.FnExecCtx   => "ctx",
-            ParameterType.Instance    => "instance",
-            _                         => throw new NotSupportedException($"{nameof(BindArgument)} {nameof(ParameterType)} {parameter.Type}"),
-        };
-    }
-
     public static string ConvertFromValue(GeneratorExecutionContext context, int i, ITypeSymbol type, ISymbol typeSource) {
         var input = $"args[{i}]";
         switch (type.SpecialType) {
@@ -203,14 +258,25 @@ public partial class BindingsGenerator : ISourceGenerator
                     return $"(List<Value>){input}";
                 }
 
-                /*if (SymbolEqualityComparer.Default.Equals(type, TypeData.MondValueNullable))
-                {
+                /*if (SymbolEqualityComparer.Default.Equals(type, TypeData.MondValueNullable)) {
                     return $"({input} == MondValue.Undefined ? null : (MondValue?){input})";
                 }*/
+
+                if (TypeData.WrappableClasses.Contains(type, SymbolEqualityComparer.Default)) {
+                    return $"(" +
+                           $"({input} as WrappedValue<{typeName}>)?.Value " +
+                           $"?? throw new InterpreterRuntimeException(\"Unable to convert argument {i} to {typeName}\")" +
+                           $")";
+                    // return $"({input} as {typeName} ?? throw new InterpreterRuntimeException(\"Unable to convert argument {i} to {typeName}\"))";
+                }
 
                 if (type.TryGetAttribute(Attributes.Class, out var attr)) {
                     var name = attr.GetArgument<string>() ?? type.Name;
                     return $"({input} as global::{type.GetFullyQualifiedName()} ?? throw new InterpreterRuntimeException(\"Unable to convert argument {i} to {name}\"))";
+                }
+
+                if (typeSource.GetAttributeArgument(Attributes.Parameter, false, 1)) {
+                    return input;
                 }
 
                 context.ReportDiagnostic(Diagnostic.Create(Diagnostics.CannotConvertFromValue, typeSource.Locations.First(), typeName));
@@ -245,6 +311,12 @@ public partial class BindingsGenerator : ISourceGenerator
                 if (SymbolEqualityComparer.Default.Equals(type, TypeData.Value)) {
                     return input;
                 }
+                if (SymbolEqualityComparer.Default.Equals(type, TypeData.ValueArray)) {
+                    return $"Value.Array((IEnumerable<Value>){input})";
+                }
+                if (TypeData.WrappableClasses.Contains(type, SymbolEqualityComparer.Default)) {
+                    return $"Value.Wrapped(ctx, {input})";
+                }
                 if (SymbolEqualityComparer.Default.Equals(type, TypeData.Prototype)) {
                     return $"{input}.GetPrototype()";
                 }
@@ -252,11 +324,28 @@ public partial class BindingsGenerator : ISourceGenerator
                     return $"Value.String({input}.ToString())";
                 }
 
+                if (SymbolEqualityComparer.Default.Equals(type, TypeData.Task)) {
+                    return $"ScriptTask.Wrap(ctx, {input});";
+                }
+
+                if (type is INamedTypeSymbol {Arity: 1} namedType && SymbolEqualityComparer.Default.Equals(namedType.ConstructedFrom, TypeData.TaskOfT)) {
+                    var returnType    = namedType.TypeArguments[0];
+                    var returnWrapper = ConvertToValue(context, "t.Result", returnType, typeSource);
+                    return $"ScriptTask.Wrap(ctx, {input}.ContinueWith(t => t.IsFaulted ? AsyncContext.RethrowAsyncException(t.Exception) : {returnWrapper}));";
+                }
+
                 //if (SymbolEqualityComparer.Default.Equals(type, TypeData.MondValueNullable)) {
                 //    return $"({input} ?? MondValue.Undefined)";
                 //}
 
-                if (type.HasAttribute(Attributes.Class)) {
+                if (type.HasAttribute(Attributes.ClassDataObject)) {
+                    if (type.HasAttribute(Attributes.ClassDataObject)) {
+                        return $"Value.ClassInstance(" +
+                               $"ctx, {input}, " +
+                               $"\"{type.GetFullyQualifiedName()}\"" +
+                               $")";
+                    }
+
                     return $"Value.ClassInstance(" +
                            $"ctx, " +
                            $"\"{type.GetFullyQualifiedName()}\"" +
@@ -269,6 +358,116 @@ public partial class BindingsGenerator : ISourceGenerator
                 return $"Value.Null() /* cannot convert {typeName} -> Value */";
         }
     }
+    public static string ConvertToType(GeneratorExecutionContext context, string input, ITypeSymbol type, ISymbol typeSource = null) {
+        if (typeSource is IMethodSymbol method) {
+            return $"Ty.Function(\"{input}\", {ConvertToType(context, input, type, null)})";
+        }
+        switch (type.SpecialType) {
+
+            case SpecialType.System_Double:
+                return $"Ty.Double()";
+            case SpecialType.System_Single:
+                return $"Ty.Float()";
+            case SpecialType.System_Int64:
+                return $"Ty.Int64()";
+            case SpecialType.System_Int32:
+            case SpecialType.System_UInt32:
+            case SpecialType.System_Int16:
+            case SpecialType.System_UInt16:
+                return $"Ty.Int32()";
+            case SpecialType.System_SByte:
+                throw new NotSupportedException("SByte is not supported");
+            case SpecialType.System_Byte:
+                throw new NotSupportedException("Byte is not supported");
+            case SpecialType.System_String:
+                return $"Ty.String()";
+            case SpecialType.System_Boolean:
+                return $"Ty.Boolean()";
+            case SpecialType.System_Void:
+                return $"Ty.Unit()";
+
+            default:
+                if (SymbolEqualityComparer.Default.Equals(type, TypeData.Value)) {
+                    return $"Ty.Object()";
+                }
+                if (SymbolEqualityComparer.Default.Equals(type, TypeData.ValueArray)) {
+                    return $"Ty.Array({ConvertToType(context, input, ((IArrayTypeSymbol)type).ElementType)})";
+                }
+                if (TypeData.WrappableClasses.Contains(type, SymbolEqualityComparer.Default)) {
+                    return $"Ty.Wrapped(ctx, {input})";
+                }
+                if (SymbolEqualityComparer.Default.Equals(type, TypeData.Prototype)) {
+                    return $"{input}.GetPrototype()";
+                }
+                if (SymbolEqualityComparer.Default.Equals(type, TypeData.RTVT)) {
+                    return $"new Ty({input})";
+                }
+
+                if (SymbolEqualityComparer.Default.Equals(type, TypeData.Task)) {
+                    return $"ScriptTask.Wrap(ctx, {input});";
+                }
+
+                // if (type is INamedTypeSymbol {Arity: 1} namedType && SymbolEqualityComparer.Default.Equals(namedType.ConstructedFrom, TypeData.TaskOfT)) {
+                    // var returnType    = namedType.TypeArguments[0];
+                    // var returnWrapper = ConvertToValue(context, "t.Result", returnType, typeSource);
+                    // return $"ScriptTask.Wrap(ctx, {input}.ContinueWith(t => t.IsFaulted ? AsyncContext.RethrowAsyncException(t.Exception) : {returnWrapper}));";
+                // }
+
+                if (type.HasAttribute(Attributes.ClassDataObject)) {
+                    if (type.HasAttribute(Attributes.ClassDataObject)) {
+                        return $"Ty.ClassInstance(" +
+                               $"ctx, {input}, " +
+                               $"\"{type.GetFullyQualifiedName()}\"" +
+                               $")";
+                    }
+
+                    return $"Ty.ClassInstance(" +
+                           $"ctx, " +
+                           $"\"{type.GetFullyQualifiedName()}\"" +
+                           (input == "" ? "" : $", {input}") +
+                           $")";
+                }
+
+                var typeName = type.GetFullyQualifiedName();
+                context.ReportDiagnostic(Diagnostic.Create(Diagnostics.CannotConvertToValue, typeSource?.Locations.First(), typeName));
+                return $"Ty.Null() /* cannot convert {typeName} -> Value */";
+        }
+    }
+
+    public static ValueTypeHint ConvertToValueTypeHint(ITypeSymbol type, ISymbol typeSource) {
+        switch (type.SpecialType) {
+
+            case SpecialType.System_Double:
+                return new ValueTypeHint("double", TypeData.PrototypeMap["DoublePrototype"]);
+            case SpecialType.System_Single:
+                return new ValueTypeHint("float", TypeData.PrototypeMap["FloatPrototype"]);
+            case SpecialType.System_Int64:
+                return new ValueTypeHint("int64", TypeData.PrototypeMap["Int64Prototype"]);
+            case SpecialType.System_Int32:
+            case SpecialType.System_UInt32:
+            case SpecialType.System_Int16:
+            case SpecialType.System_UInt16:
+                return new ValueTypeHint("int32", TypeData.PrototypeMap["Int32Prototype"]);
+            case SpecialType.System_SByte:
+                throw new NotSupportedException("SByte is not supported");
+            case SpecialType.System_Byte:
+                throw new NotSupportedException("Byte is not supported");
+            case SpecialType.System_String:
+                return new ValueTypeHint("string", TypeData.PrototypeMap["StringPrototype"]);
+            case SpecialType.System_Boolean:
+                return new ValueTypeHint("boolean", TypeData.PrototypeMap["BooleanPrototype"]);
+
+            case SpecialType.System_Void:
+                return new ValueTypeHint("void", TypeData.PrototypeMap["UnitPrototype"]);
+
+            default:
+                return new ValueTypeHint(
+                    "object",
+                    TypeData.PrototypeMap["ObjectPrototype"],
+                    type
+                );
+        }
+    }
 
 
     private static string CompareArgument(int i, Parameter p) {
@@ -276,16 +475,27 @@ public partial class BindingsGenerator : ISourceGenerator
                     p.Types.Count == 0 ||
                     (p.Types.Count == 1 && p.Types[0] == ValueType.Unit);
 
-        var comparer = isAny
-            ? $"(true /* args[{i}] is any */)"
-            : "(" + string.Join(" || ", p.Types.Select(t => $"args[{i}].Type == RTVT.{t}")) + ")";
+        var comparer = "";
+        if (isAny) {
+            comparer = $"(true /* args[{i}] is any */)";
+        } else {
+            var comparableTypes = p.Types
+                   .Where(t => t != ValueType.Unit && t != ValueType.WrappedValue)
+                   .Select(t => $"args[{i}].Type == RTVT.{t}")
+                ;
+            comparer = $"({comparableTypes.Join(" || ")})";
+        }
+
+        // var comparer = isAny
+        //     ? $"(true /* args[{i}] is any */)"
+        //     : "(" + string.Join(" || ", p.Types.Select(t => $"args[{i}].Type == RTVT.{t}")) + ")";
 
         return p.IsOptional
             ? $"(args.Length > {i} && {comparer})"
             : comparer;
     }
 
-    private static string GetMethodNotMatchedErrorMessage(string prefix, MethodData methodTable) {
+    public static string GetMethodNotMatchedErrorMessage(string prefix, MethodData methodTable) {
         var sb = new StringBuilder();
 
         sb.Append(prefix);
@@ -324,15 +534,19 @@ public partial class BindingsGenerator : ISourceGenerator
         return CompareArguments(method, out _, limit);
     }
 
-    private static string EscapeForStringLiteral(string str) {
+    public static string EscapeForStringLiteral(string str) {
         return str
            .Replace("\r", "")
            .Replace(@"\", @"\\")
            .Replace("\n", @"\n");
     }
 
-    
-    private static List<(IMethodSymbol Method, string Name, string Identifier)> GetMethods(GeneratorExecutionContext context, INamedTypeSymbol klass, bool? isStatic = null) {
+
+    private static List<(IMethodSymbol Method, string Name, string Identifier)> GetMethods(
+        GeneratorExecutionContext context,
+        INamedTypeSymbol          klass,
+        bool?                     isStatic = null
+    ) {
         var result = new List<(IMethodSymbol, string, string)>();
 
         foreach (var member in klass.GetMembers()) {
@@ -360,7 +574,7 @@ public partial class BindingsGenerator : ISourceGenerator
 
             string name = null;
             if (hasFuncAttr) {
-                name = (funcAttr.GetArgument<string>() ?? method.Name).ToCamelCase();
+                name = (funcAttr.GetArgument<string>() ?? method.Name).ToIdentifierCasing();
                 result.Add((method, name, name));
                 continue;
             }
@@ -371,21 +585,6 @@ public partial class BindingsGenerator : ISourceGenerator
         }
 
         return result;
-    }
-
-    public class PropertyBind
-    {
-        public string Name { get; set; }
-
-        public bool HasGetter { get; set; }
-        public bool HasSetter { get; set; }
-
-        public IPropertySymbol Property { get; set; }
-
-        public ITypeSymbol Type => Property.Type;
-
-        public IMethodSymbol GetMethod => HasGetter && Property.DeclaredAccessibility == Accessibility.Public ? Property.GetMethod : null;
-        public IMethodSymbol SetMethod => HasSetter && Property.DeclaredAccessibility == Accessibility.Public ? Property.SetMethod : null;
     }
 
     private static IEnumerable<PropertyBind> GetProperties(GeneratorExecutionContext context, INamedTypeSymbol klass, bool? isStatic = null) {
@@ -425,7 +624,10 @@ public partial class BindingsGenerator : ISourceGenerator
                 continue;
             }
 
-            var p = new PropertyBind {
+            var p = new PropertyBind(
+                property,
+                context.Compilation
+            ) {
                 Name      = name,
                 HasGetter = hasGetter,
                 HasSetter = hasSetter,
@@ -437,10 +639,20 @@ public partial class BindingsGenerator : ISourceGenerator
 
     }
 
-    private static List<IMethodSymbol> GetConstructors(GeneratorExecutionContext context, INamedTypeSymbol klass) {
+    private static List<IMethodSymbol> GetConstructors(
+        GeneratorExecutionContext context,
+        INamedTypeSymbol          klass,
+        bool                      allowMethods = false
+    ) {
         var result = new List<IMethodSymbol>();
         foreach (var member in klass.GetMembers()) {
-            if (member is not IMethodSymbol {MethodKind: MethodKind.Constructor} method) {
+            if (member is not IMethodSymbol method) {
+                continue;
+            }
+            if (!(
+                    method.MethodKind == MethodKind.Constructor ||
+                    (allowMethods && method.MethodKind == MethodKind.Ordinary)
+                )) {
                 continue;
             }
 
@@ -459,48 +671,54 @@ public partial class BindingsGenerator : ISourceGenerator
         return result;
     }
 
-    private delegate void GeneratorAction(GeneratorExecutionContext context, INamedTypeSymbol symbol, Writer writer);
+    private delegate void GeneratorAction(
+        GeneratorExecutionContext context,
+        INamedTypeSymbol          symbol,
+        ClassTypeData             typeData
+    );
 
-    private static string GenerateWith(GeneratorExecutionContext context, INamedTypeSymbol symbol, GeneratorAction generator) {
-        var writer = new Writer();
-
-        writer.AddGeneratedHeader();
-        writer.WithImports(
+    private static string GenerateWith(
+        GeneratorExecutionContext context,
+        INamedTypeSymbol          symbol,
+        ClassTypeData             typeData,
+        GeneratorAction           generator
+    ) {
+        typeData.AddGeneratedHeader();
+        typeData.WithImports(
             "System",
             "System.Collections.Generic",
-            "CSScriptingLang.RuntimeValues",
-            "CSScriptingLang.RuntimeValues.Values",
-            "CSScriptingLang.Interpreter.Context",
-            "CSScriptingLang.RuntimeValues.Types",
-            "CSScriptingLang.Interpreter.Libraries",
-            "CSScriptingLang.Lexing"
+            $"{Constants.RootNamespace}.RuntimeValues",
+            $"{Constants.RootNamespace}.RuntimeValues.Values",
+            $"{Constants.RootNamespace}.RuntimeValues.Prototypes.Types",
+            $"{Constants.RootNamespace}.Interpreter.Context",
+            $"{Constants.RootNamespace}.RuntimeValues.Types",
+            $"{Constants.RootNamespace}.Interpreter.Libraries",
+            $"{Constants.RootNamespace}.Lexing",
+            $"{Constants.RootNamespace}.Core.Async"
         );
 
 
         var ns = symbol.GetFullNamespace();
         if (ns != null) {
-            writer.WithNamespace(ns);
+            typeData.WithNamespace(ns);
         }
 
-        writer.AddHeaderLine("#pragma warning disable CS0162 // Unreachable code detected");
+        typeData.AddHeaderLine("#pragma warning disable CS0162 // Unreachable code detected");
 
         var parents = symbol.GetParentTypes();
         for (var i = parents.Count - 1; i >= 0; i--) {
-            writer._($"public partial class {parents[i].Name}");
-            writer.OpenBracket();
+            typeData._($"public partial class {parents[i].Name}");
+            typeData.OpenBracket();
         }
 
-        writer._($"public {(symbol.IsStatic ? "static" : "")} partial class {symbol.Name}");
-        writer.OpenBracket();
-
-        generator(context, symbol, writer);
-
-        writer.CloseBracket();
+        using (typeData.B($"public{(symbol.IsStatic ? " static" : "")} partial class {symbol.Name}")) {
+            generator(context, symbol, typeData);
+        }
 
         for (var i = 0; i < parents.Count; i++) {
-            writer.CloseBracket();
+            typeData.CloseBracket();
         }
 
-        return writer.ToString();
+        return typeData.ToString();
     }
 }

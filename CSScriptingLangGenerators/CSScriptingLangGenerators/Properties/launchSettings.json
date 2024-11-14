@@ -3,7 +3,7 @@
   "profiles": {
     "DebugRoslynSourceGenerator": {
       "commandName": "DebugRoslynComponent",
-      "targetProject": "../CSScriptingLangGenerators.Sample/CSScriptingLangGenerators.Sample.csproj"
+      "targetProject": "../../CSScriptingLang/CSScriptingLang.csproj"
     }
   }
 }

@@ -1,0 +1,14 @@
+
+type OtherObject struct
+{
+  pls string
+}
+type MyObject struct
+{
+  Value OtherObject
+  a int
+}
+function run(MyObject o) {
+    var x = o.a;
+    var b = o.Value;
+}

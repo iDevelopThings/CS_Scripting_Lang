@@ -1,0 +1,143 @@
+﻿
+
+function main() {
+    var server = new<HttpServer>();
+    var r = server.getRouter();
+    var myServer = server;
+    // server is now a new instance of HttpServer
+}
+
+var testing = {};
+
+
+/*
+ * Testing block comment
+ */
+var objj = {
+ a : 1,
+ b : 'true',
+ c : "PLS",
+ d : true,
+ e : { bye : { message : 'bye' }}
+};
+
+
+// test line comment
+type OtherObject struct { // test end of line comment
+    A Number
+}
+
+type MyObject struct
+{
+  Value OtherObject
+  a string
+  v obj
+  v Object
+  def toJson() object;
+  def fromJson(string json) object;
+}
+
+var msg = objj.e.bye.message;
+var msg = objj.e.bye.message;
+
+function run(MyObject o) {
+    var pls = objj;
+    // var pls = objj.a;
+
+    var x = o.a;
+    var y = o.v.toJson();
+    var a = o.Value.A;
+    var a = o.Value
+    var jsonStr = o.toJson();
+    var jsonStr = o.toJson();
+    run()
+}
+
+
+
+
+
+
+
+
+
+
+type Array struct
+{
+  def push(int pls, int plspsl) int32;
+  def removeAt(object index) int32;
+  def removeRange(object start, object end) int32;
+  def getEnumerator() object;
+}
+
+var x = 0;
+
+var b = 0;
+var b = true;
+var b = 'hi';
+var b = false;
+
+function run() {
+    var j = obj.toJson();
+    var j = obj.toJson();
+
+    obj.getEnumerator();
+
+    var pls = obj.e.bye.message;
+    obj.serialize();
+}
+
+var runFnReference = run;
+
+var myFnReference = testing;
+var myVarReference = myFnReference;
+
+type HttpResponse struct
+{
+  message string
+}
+
+/*
+
+function testing() {
+    var http = require('http/test_middleware.vlt');
+    var server = new<HttpServer>('127.0.0.1:6969');
+}
+
+function withReturnType() TestJsonRequest {
+    return TestJsonRequest()
+    // return new<TestJsonRequest>()
+}
+function withReturnType() HttpServer {
+    var server = new<HttpServer>();
+    return server;
+}
+
+type TestJsonRequest struct {
+    Message string
+    Number int
+    Bool bool
+    FromString int
+}
+
+// server.listen()
+var (x, y) = (1, 2);
+
+//var http = require('http/test_middleware.vlt');
+//var server = new<HttpServer>('127.0.0.1:6969');
+
+var a = b; // 'b' = regular var ref
+var a = arr[0][1].a.c.b; // arr index access
+var a = obj.c.b; // object member access
+var a = listen();  // regular call
+var a = arr[0][1].a.c.b(); // arr index access & call
+var a = new<Type>(); // call with type arg
+var a = arr[0][1].a.c.b<Type, typeb>(); // arr index access & call
+var a = obj.c.b.fn<Type>(); // object member access & call with type arg
+
+var a = new<type>(); // call with type arg
+var a = arr[0][1].a.c.b<type, type>(); // arr index access & call
+var a = obj.c.b.fn<type>(); // object member access & call with type arg
+
+
+*/

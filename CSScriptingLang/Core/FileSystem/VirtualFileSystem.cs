@@ -1,11 +1,7 @@
 ﻿using System.Text.RegularExpressions;
-using Engine.Engine.Logging;
+using CSScriptingLang.Core.Logging;
 
 namespace CSScriptingLang.Core.FileSystem;
-
-using System;
-using System.Collections.Generic;
-using System.IO;
 
 public interface IVirtualEntry
 {

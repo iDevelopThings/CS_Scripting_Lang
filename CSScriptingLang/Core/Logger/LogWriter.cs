@@ -2,7 +2,7 @@
 using CSScriptingLang.Lexing;
 using CSScriptingLang.Utils;
 
-namespace Engine.Engine.Logging;
+namespace CSScriptingLang.Core.Logging;
 
 public class LogWriter
 {
@@ -62,9 +62,13 @@ public class LogWriter
                   $"[{message.Logger.GetColoredName()}] " +
                   $"{message.Message}";*/
 
+        Format(output, message);
         Output(output, message);
     }
 
+    public virtual void Format(StringBuilder output, LogMessage message) {
+        
+    }
     public virtual void Output(StringBuilder output, LogMessage message) {
         Console.WriteLine(output);
     }
@@ -77,12 +81,10 @@ public class LogWriter
 public class LogWriter_Syntax : LogWriter
 {
     public static HashSet<Type> SyntaxExceptionTypes = [
-        typeof(SyntaxException),
-        typeof(ParserException),
+        // typeof(SyntaxException),
+        // typeof(ParserException),
         typeof(InterpreterException),
-        typeof(FatalInterpreterException),
-        typeof(DeclarationException),
-        typeof(LexerException),
+        // typeof(LexerException),
         typeof(FailedToGetRuntimeTypeException),
     ];
 
@@ -129,7 +131,7 @@ public class LogWriter_Syntax : LogWriter
         return false;
     }
 
-    public override void Output(StringBuilder output, LogMessage message) {
+    public override void Format(StringBuilder output, LogMessage message) {
         if (message.GetContext<BaseLanguageException>(out var exception)) {
             var caller = exception.Caller.IsValid() ? exception.Caller : message.Caller;
             var input  = exception.Input;
@@ -140,34 +142,31 @@ public class LogWriter_Syntax : LogWriter
 
             ErrorWriter.SetScriptIfUndefined(exception.Script);
 
-            if (message.GetContext<SyntaxException>(out var ex)) {
-                sb = ew.LogError(ex.Message, ex.Token, ex.Token);
-            } else if (message.GetContext<ParserException>(out var pex)) {
-                sb = ew.LogError(pex.Message, pex.From, pex.To);
-            } else if (message.GetContext<LexerException>(out var lex)) {
-                sb = ew.LogError(lex.Message, lex.From, lex.To);
-            } else if (message.GetContext<InterpreterException>(out var iex)) {
-                sb = ew.LogError(iex.Message, iex.Node);
-            } else if (message.GetContext<DeclarationException>(out var dex)) {
-                sb = ew.LogError(dex.Message, dex.Node);
-            } else {
+            // if (message.GetContext<SyntaxException>(out var ex)) {
+                // sb = ew.LogError(ex.Message, ex.Token, ex.Token);
+            // } else if (message.GetContext<ParserException>(out var pex)) {
+                // sb = ew.LogError(pex.Message, pex.From, pex.To);
+            // if (message.GetContext<LexerException>(out var lex)) {
+                // sb = ew.LogError(lex.Message, lex.From, lex.To);
+             // if (message.GetContext<InterpreterException>(out var iex)) {
+                // sb = ew.LogError(iex.Message, iex.Node);
+            // } else if (message.GetContext<DeclarationException>(out var dex)) {
+                // sb = ew.LogError(dex.Message, dex.Node);
+            // } else {
                 sb = new StringBuilder();
                 sb.AppendLine($"Unknown exception type: {exception.GetType().Name}");
                 sb.AppendLine(exception.Message);
-            }
+            // }
 
             output.AppendLine();
             output.Append(sb);
 
-            Console.WriteLine(output);
-            
             if (!exception.Trace.IsEmpty()) {
-                Console.WriteLine("Trace:".BrightGray() + "\n");
-                Console.WriteLine(exception.Trace.ToString());
+                output.AppendLine("Trace:".BrightGray() + "\n");
+                output.AppendLine(exception.Trace.ToString());
             }
-            
         } else {
-            throw new InvalidOperationException("LogWriter_Syntax should only be used with exceptions");
+            output.AppendLine(message.Message);
         }
 
     }

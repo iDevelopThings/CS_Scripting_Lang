@@ -1,6 +1,9 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using CSScriptingLang.Interpreter.Context;
 using CSScriptingLang.Lexing;
 using CSScriptingLang.RuntimeValues.Types;
+using CSScriptingLang.Utils;
 
 namespace CSScriptingLang.RuntimeValues.Values;
 
@@ -9,8 +12,12 @@ public partial class Value
 
     public Value Operator(OperatorType op, Value other) {
         return op switch {
-            OperatorType.Plus               => Operator_Add(other),
-            OperatorType.Minus              => Operator_Sub(other),
+            OperatorType.Plus       => Operator_Add(other),
+            OperatorType.PlusEquals => Operator_AddAssign(other),
+
+            OperatorType.Minus       => Operator_Sub(other),
+            OperatorType.MinusEquals => Operator_SubAssign(other),
+
             OperatorType.Multiply           => Operator_Mul(other),
             OperatorType.Divide             => Operator_Div(other),
             OperatorType.Modulus            => Operator_Mod(other),
@@ -20,11 +27,17 @@ public partial class Value
             OperatorType.GreaterThan        => Operator_GreaterThan(other),
             OperatorType.GreaterThanOrEqual => Operator_GreaterThanEqual(other),
 
-            OperatorType.Equals    => Operator_Equal(other),
-            OperatorType.NotEquals => Operator_NotEqual(other),
+            OperatorType.Equals          => Operator_Equal_Boxed(other, false),
+            OperatorType.EqualsStrict    => Operator_Equal_Boxed(other, true),
+            OperatorType.NotEquals       => Operator_NotEqual_Boxed(other, false),
+            OperatorType.NotEqualsStrict => Operator_NotEqual_Boxed(other, true),
 
-            OperatorType.And => Operator_ConditionalAnd(other),
-            OperatorType.Or  => Operator_ConditionalOr(other),
+            OperatorType.BitwiseAnd => Operator_BitwiseAnd(other),
+            OperatorType.And        => Operator_ConditionalAnd(other),
+
+            OperatorType.Pipe => Operator_ConditionalOr(other),
+            OperatorType.Or   => Operator_ConditionalOr(other),
+
             OperatorType.Not => Operator_ConditionalNot(),
 
             OperatorType.Increment => Operator_Increment(),
@@ -36,22 +49,51 @@ public partial class Value
 
     #region Operator Equals
 
-    /*[MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool operator ==(Value a, Value b) {
-        if (b == null) {
-            return a == null;
-        }
-
-        return a?.Operator_Equal(b) ?? b?.Is.Null == true;
-    }*/
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [DebuggerStepThrough]
+    private Value Operator_Equal_Boxed(Value other, bool isStrict) => Operator_Equal(other, isStrict);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Operator_Equal(Value other) {
+    public bool Operator_Equal(Value other, bool isStrict) {
         if (other == null) {
             return false;
         }
 
-        switch (Type) {
+        if (FullType == other?.FullType || isStrict) {
+            var aV = FullValue;
+            var bV = other.FullValue;
+            var eq = Equals(aV, bV);
+            return eq;
+        }
+
+        if (TypeCoercion.TryCoerce(this, other, out var commonType, out var a, out var b)) {
+            switch (commonType) {
+                case RTVT.String:   return ((string) a == (string) b);
+                case RTVT.Int32:    return ((int) a == (int) b);
+                case RTVT.Int64:    return ((long) a == (long) b);
+                case RTVT.Float:    return ((float) a == (float) b);
+                case RTVT.Double:   return ((double) a == (double) b);
+                case RTVT.Boolean:  return ((bool) a == (bool) b);
+                case RTVT.Function: return ReferenceEquals(a.As.Fn(), b.As.Fn());
+                case RTVT.Array:    return ReferenceEquals(a.As.List(), b.As.List());
+                case RTVT.Object: {
+                    if (DispatchCall(OperatorType.Equals, [other], out var objResult)) {
+                        return objResult.As.Bool();
+                    }
+
+                    return ReferenceEquals(a.Members, b.Members);
+                }
+                default: {
+                    if (DispatchCall(OperatorType.Equals, [other], out var result)) {
+                        return result.IsTruthy();
+                    }
+
+                    return Type == other.Type;
+                }
+            }
+        }
+
+        /*switch (FullType) {
             case RTVT.Int32:
                 return As.Int32() == other.As.Int32();
             case RTVT.Int64:
@@ -69,7 +111,7 @@ public partial class Value
             case RTVT.Array:
                 return other?.Is.Array == true && ReferenceEquals(As.List(), other.As.List());
             case RTVT.Object: {
-                if (DispatchCall("__eq", [other], out var objResult)) {
+                if (DispatchCall(OperatorType.Equals, [other], out var objResult)) {
                     return objResult.As.Bool();
                 }
 
@@ -77,43 +119,39 @@ public partial class Value
             }
 
             default: {
-                if (DispatchCall("__eq", [other], out var defaultResult)) {
-                    return defaultResult.IsTruthy();
+                if (DispatchCall(OperatorType.Equals, [other], out var result)) {
+                    return result.IsTruthy();
                 }
 
                 return Type == other.Type;
             }
 
-        }
+        }*/
 
+        throw new InterpreterRuntimeException($"Cannot compare {Type} and {other.Type}");
     }
 
     #endregion
 
     #region Operator NotEqual
 
-    /*[MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool operator !=(Value a, Value b) {
-        if (b == null) {
-            return a != null;
-        }
-
-        return a?.Operator_NotEqual(b) ?? b?.Is.Null == false;
-    }*/
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [DebuggerStepThrough]
+    public Value Operator_NotEqual_Boxed(Value other, bool isStrict) => Operator_NotEqual(other, isStrict);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Operator_NotEqual(Value other) {
+    public bool Operator_NotEqual(Value other, bool isStrict) {
         if (other == null) {
             return true;
         }
 
         if (Is.Object) {
-            if (DispatchCall("__neq", [other], out var objResult)) {
+            if (DispatchCall(OperatorType.NotEquals, [other], out var objResult)) {
                 return objResult.As.Bool();
             }
         }
 
-        return !Operator_Equal(other);
+        return !Operator_Equal(other, isStrict);
     }
 
     #endregion
@@ -122,20 +160,15 @@ public partial class Value
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Value Operator_Assign(Value other) {
+        if (DispatchCall(OperatorType.Assignment, [other], out var result)) {
+            return result;
+        }
+
         if (SetValue(other, false)) {
             return this;
         }
 
-        return Dispatch_Operator_Assign(other);
-    }
-    
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Value Dispatch_Operator_Assign(Value other) {
-        if (DispatchCall("__assign", [other], out var result)) {
-            return result;
-        }
-
-        throw new InvalidCastException($"Cannot Assign {Type} and {other.Type}");
+        throw new InterpreterRuntimeException($"Cannot Assign {Type} and {other.Type}");
     }
 
     #endregion
@@ -156,16 +189,11 @@ public partial class Value
         if (Is.Double)
             return Operator_Assign(As.Double() + 1);
 
-        return Dispatch_Operator_Increment();
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Value Dispatch_Operator_Increment() {
-        if (DispatchCall("__increment", [], out var result)) {
+        if (DispatchCall(OperatorType.Increment.GetOverloadFnName(), [], out var result)) {
             return result;
         }
 
-        throw new InvalidCastException($"Cannot Increment {Type}");
+        throw new InterpreterRuntimeException($"Cannot Increment {Type}");
     }
 
     #endregion
@@ -186,17 +214,10 @@ public partial class Value
         if (Is.Double)
             return Operator_Assign(As.Double() - 1);
 
-
-        return Dispatch_Operator_Decrement();
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Value Dispatch_Operator_Decrement() {
-        if (DispatchCall("__decrement", [], out var result)) {
+        if (DispatchCall(OperatorType.Decrement, [], out var result)) {
             return result;
         }
-
-        throw new InvalidCastException($"Cannot Decrement {Type}");
+        throw new InterpreterRuntimeException($"Cannot Decrement {Type}");
     }
 
     #endregion
@@ -208,31 +229,51 @@ public partial class Value
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Value Operator_Add(Value other) {
-        if (Is.String || other.Is.String) {
-            return As.String() + other.As.String();
+        if (TypeCoercion.TryCoerce(this, other, out var commonType, out var a, out var b)) {
+            switch (commonType) {
+                case RTVT.String:  return ((string) a + (string) b);
+                case RTVT.Int32:   return ((int) a + (int) b);
+                case RTVT.Int64:   return ((long) a + (long) b);
+                case RTVT.Float:   return ((float) a + (float) b);
+                case RTVT.Double:  return ((double) a + (double) b);
+                case RTVT.Boolean: return ((bool) a ? 1 : 0) + ((bool) b ? 1 : 0);
+            }
         }
 
-        if (Is.Int32) return As.Int32() + other.As.Int32();
-        if (Is.Int64) return As.Int64() + other.As.Int64();
-        if (Is.Float) return As.Float() + other.As.Float();
-        if (Is.Double) return As.Double() + other.As.Double();
+        /*var commonType = TypeCoercion.GetCommonType(FullType, other.FullType);
+        var a          = TypeCoercion.CastTo(this, commonType);
+        var b          = TypeCoercion.CastTo(other, commonType);
 
+        switch (commonType) {
+            case RTVT.String:  return ((string) a + (string) b);
+            case RTVT.Int32:   return ((int) a + (int) b);
+            case RTVT.Int64:   return ((long) a + (long) b);
+            case RTVT.Float:   return ((float) a + (float) b);
+            case RTVT.Double:  return ((double) a + (double) b);
+            case RTVT.Boolean: return ((bool) a ? 1 : 0) + ((bool) b ? 1 : 0);
+        }
+        */
 
-        return Dispatch_Operator_Add(other);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Value Dispatch_Operator_Add(Value other) {
-        if (DispatchCall("__add", [other], out var result)) {
+        if (DispatchCall(OperatorType.Plus, [other], out var result)) {
             return result;
         }
 
-        if (other.Is.Int32) return As.Int32() + other.As.Int32();
-        if (other.Is.Int64) return As.Int64() + other.As.Int64();
-        if (other.Is.Float) return As.Float() + other.As.Float();
-        if (other.Is.Double) return As.Double() + other.As.Double();
+        throw new InterpreterRuntimeException($"Cannot Add {Type} and {other.Type}");
+    }
 
-        throw new InvalidCastException($"Cannot Add {Type} and {other.Type}");
+    #endregion
+
+    #region Operator AddAssign
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Value Operator_AddAssign(Value other) {
+        if (Is.Signal && other.Is.Function) {
+            other.ToDebugString();
+            As.Signal().AddListener(other);
+            return this;
+        }
+
+        return Operator_Add(other);
     }
 
     #endregion
@@ -244,26 +285,41 @@ public partial class Value
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Value Operator_Sub(Value other) {
-        if (Is.Int32) return As.Int() - other.As.Int();
-        if (Is.Int64) return As.Long() - other.As.Long();
-        if (Is.Float) return As.Float() - other.As.Float();
-        if (Is.Double) return As.Double() - other.As.Double();
 
-        return Dispatch_Operator_Sub(other);
-    }
+        if (TypeCoercion.TryCoerce(this, other, out var commonType, out var a, out var b)) {
+            switch (commonType) {
+                case RTVT.Int32:   return ((int) a - (int) b);
+                case RTVT.Int64:   return ((long) a - (long) b);
+                case RTVT.Float:   return ((float) a - (float) b);
+                case RTVT.Double:  return ((double) a - (double) b);
+                case RTVT.Boolean: return ((bool) a ? 1 : 0) - ((bool) b ? 1 : 0);
+            }
+        }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Value Dispatch_Operator_Sub(Value other) {
-        if (DispatchCall("__sub", [other], out var result)) {
+
+        // if (Is.Int32) return As.Int() - other.As.Int();
+        // if (Is.Int64) return As.Long() - other.As.Long();
+        // if (Is.Float) return As.Float() - other.As.Float();
+        // if (Is.Double) return As.Double() - other.As.Double();
+
+        if (DispatchCall(OperatorType.Minus, [other], out var result)) {
             return result;
         }
 
-        if (other.Is.Int32) return As.Int32() - other.As.Int32();
-        if (other.Is.Int64) return As.Int64() - other.As.Int64();
-        if (other.Is.Float) return As.Float() - other.As.Float();
-        if (other.Is.Double) return As.Double() - other.As.Double();
+        throw new InterpreterRuntimeException($"Cannot Sub {Type} and {other.Type}");
+    }
 
-        throw new InvalidCastException($"Cannot Sub {Type} and {other.Type}");
+    #endregion
+
+    #region Operator SubAssign
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Value Operator_SubAssign(Value other) {
+        if (Is.Signal && other.Is.Function) {
+            As.Signal().RemoveListener(other);
+            return this;
+        }
+        return Operator_Sub(other);
     }
 
     #endregion
@@ -275,26 +331,26 @@ public partial class Value
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Value Operator_Mul(Value other) {
-        if (Is.Int32) return As.Int() * other.As.Int();
-        if (Is.Int64) return As.Long() * other.As.Long();
-        if (Is.Float) return As.Float() * other.As.Float();
-        if (Is.Double) return As.Double() * other.As.Double();
+        if (TypeCoercion.TryCoerce(this, other, out var commonType, out var a, out var b)) {
+            switch (commonType) {
+                case RTVT.Int32:   return ((int) a * (int) b);
+                case RTVT.Int64:   return ((long) a * (long) b);
+                case RTVT.Float:   return ((float) a * (float) b);
+                case RTVT.Double:  return ((double) a * (double) b);
+                case RTVT.Boolean: return ((bool) a ? 1 : 0) * ((bool) b ? 1 : 0);
+            }
+        }
 
-        return Dispatch_Operator_Mul(other);
-    }
+        // if (Is.Int32) return As.Int() * other.As.Int();
+        // if (Is.Int64) return As.Long() * other.As.Long();
+        // if (Is.Float) return As.Float() * other.As.Float();
+        // if (Is.Double) return As.Double() * other.As.Double();
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Value Dispatch_Operator_Mul(Value other) {
-        if (DispatchCall("__mul", [other], out var result)) {
+        if (DispatchCall(OperatorType.Multiply, [other], out var result)) {
             return result;
         }
 
-        if (other.Is.Int32) return As.Int32() * other.As.Int32();
-        if (other.Is.Int64) return As.Long() * other.As.Long();
-        if (other.Is.Float) return As.Float() * other.As.Float();
-        if (other.Is.Double) return As.Double() * other.As.Double();
-
-        throw new InvalidCastException($"Cannot Mul {Type} and {other.Type}");
+        throw new InterpreterRuntimeException($"Cannot Mul {Type} and {other.Type}");
     }
 
     #endregion
@@ -311,35 +367,22 @@ public partial class Value
                 Logger.Error("Division by zero");
                 return 0;
             }
-
-            if (Is.Int32) return As.Int() / other.As.Int();
-            if (Is.Int64) return As.Long() / other.As.Long();
-            if (Is.Float) return As.Float() / other.As.Float();
-            if (Is.Double) return As.Double() / other.As.Double();
         }
 
-        return Dispatch_Operator_Div(other);
-    }
+        if (TypeCoercion.TryCoerce(this, other, out var commonType, out var a, out var b)) {
+            switch (commonType) {
+                case RTVT.Int32:   return ((int) a / (int) b);
+                case RTVT.Int64:   return ((long) a / (long) b);
+                case RTVT.Float:   return ((float) a / (float) b);
+                case RTVT.Double:  return ((double) a / (double) b);
+                case RTVT.Boolean: return ((bool) a ? 1 : 0) / ((bool) b ? 1 : 0);
+            }
+        }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Value Dispatch_Operator_Div(Value other) {
-        if (DispatchCall("__div", [other], out var result)) {
+        if (DispatchCall(OperatorType.Divide, [other], out var result)) {
             return result;
         }
-
-        if (other.Is.Number) {
-            if (other.Is.ZeroValue()) {
-                Logger.Error("Division by zero");
-                return 0;
-            }
-
-            if (Is.Int32) return As.Int32() / other.As.Int32();
-            if (Is.Int64) return As.Long() / other.As.Long();
-            if (Is.Float) return As.Float() / other.As.Float();
-            if (Is.Double) return As.Double() / other.As.Double();
-        }
-
-        throw new InvalidCastException($"Cannot Div {Type} and {other.Type}");
+        throw new InterpreterRuntimeException($"Cannot Div {Type} and {other.Type}");
     }
 
     #endregion
@@ -351,26 +394,22 @@ public partial class Value
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Value Operator_Mod(Value other) {
-        if (Is.Int32) return As.Int() % other.As.Int();
-        if (Is.Int64) return As.Long() % other.As.Long();
-        if (Is.Float) return As.Float() % other.As.Float();
-        if (Is.Double) return As.Double() % other.As.Double();
 
-        return Dispatch_Operator_Mod(other);
-    }
+        if (TypeCoercion.TryCoerce(this, other, out var commonType, out var a, out var b)) {
+            switch (commonType) {
+                case RTVT.Int32:   return ((int) a % (int) b);
+                case RTVT.Int64:   return ((long) a % (long) b);
+                case RTVT.Float:   return ((float) a % (float) b);
+                case RTVT.Double:  return ((double) a % (double) b);
+                case RTVT.Boolean: return ((bool) a ? 1 : 0) % ((bool) b ? 1 : 0);
+            }
+        }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Value Dispatch_Operator_Mod(Value other) {
-        if (DispatchCall("__mod", [other], out var result)) {
+        if (DispatchCall(OperatorType.Modulus, [other], out var result)) {
             return result;
         }
 
-        if (other.Is.Int32) return As.Int() % other.As.Int();
-        if (other.Is.Int64) return As.Long() % other.As.Long();
-        if (other.Is.Float) return As.Float() % other.As.Float();
-        if (other.Is.Double) return As.Double() % other.As.Double();
-
-        throw new InvalidCastException($"Cannot Mod {Type} and {other.Type}");
+        throw new InterpreterRuntimeException($"Cannot Mod {Type} and {other.Type}");
     }
 
     #endregion
@@ -379,21 +418,20 @@ public partial class Value
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Value Operator_Pow(Value other) {
-        if (Is.Int32) return (int) Math.Pow(As.Int(), other.As.Int());
-        if (Is.Int64) return (long) Math.Pow(As.Long(), other.As.Long());
-        if (Is.Float) return (float) Math.Pow(As.Float(), other.As.Float());
-        if (Is.Double) return Math.Pow(As.Double(), other.As.Double());
+        if (TypeCoercion.TryCoerce(this, other, out var commonType, out var a, out var b)) {
+            switch (commonType) {
+                case RTVT.Int32:  return (int) Math.Pow((int) a, (int) b);
+                case RTVT.Int64:  return (long) Math.Pow((long) a, (long) b);
+                case RTVT.Float:  return (float) Math.Pow((float) a, (float) b);
+                case RTVT.Double: return Math.Pow((double) a, (double) b);
+            }
+        }
 
-        return Dispatch_Operator_Pow(other);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Value Dispatch_Operator_Pow(Value other) {
-        if (DispatchCall("__pow", [other], out var result)) {
+        if (DispatchCall(OperatorType.Pow, [other], out var result)) {
             return result;
         }
 
-        throw new InvalidCastException($"Cannot Pow {Type} and {other.Type}");
+        throw new InterpreterRuntimeException($"Cannot Pow {Type} and {other.Type}");
     }
 
     #endregion
@@ -405,23 +443,21 @@ public partial class Value
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Value Operator_LessThan(Value other) {
-        if (Is.Int32 && other.Is.Int32) return As.Int32() < other.As.Int32();
-        if (Is.Int64 && other.Is.Int64) return As.Long() < other.As.Long();
-        if (Is.Float && other.Is.Float) return As.Float() < other.As.Float();
-        if (Is.Double && other.Is.Double) return As.Double() < other.As.Double();
-
-        return Dispatch_Operator_LessThan(other);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Value Dispatch_Operator_LessThan(Value other) {
-        if (Is.String && other.Is.String) {
-            return string.Compare(As.String(), other.As.String(), StringComparison.Ordinal) < 0;
+        if (TypeCoercion.TryCoerce(this, other, out var commonType, out var a, out var b)) {
+            switch (commonType) {
+                case RTVT.Int32:  return ((int) a < (int) b);
+                case RTVT.Int64:  return ((long) a < (long) b);
+                case RTVT.Float:  return ((float) a < (float) b);
+                case RTVT.Double: return ((double) a < (double) b);
+                case RTVT.String: return string.Compare((string) a, (string) b, StringComparison.Ordinal) < 0;
+            }
         }
-        if (DispatchCall("__lt", [other], out var result)) {
+
+        if (DispatchCall(OperatorType.LessThan, [other], out var result)) {
             return result;
         }
-        throw new InvalidCastException($"Cannot LessThan {Type} and {other.Type}");
+
+        throw new InterpreterRuntimeException($"Cannot LessThan {Type} and {other.Type}");
     }
 
     #endregion
@@ -433,23 +469,21 @@ public partial class Value
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Value Operator_LessThanEqual(Value other) {
-        if (Is.Int32 && other.Is.Int32) return As.Int32() <= other.As.Int32();
-        if (Is.Int64 && other.Is.Int64) return As.Long() <= other.As.Long();
-        if (Is.Float && other.Is.Float) return As.Float() <= other.As.Float();
-        if (Is.Double && other.Is.Double) return As.Double() <= other.As.Double();
-
-        return Dispatch_Operator_LessThanEqual(other);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Value Dispatch_Operator_LessThanEqual(Value other) {
-        if (Is.String && other.Is.String) {
-            return string.Compare(As.String(), other.As.String(), StringComparison.Ordinal) <= 0;
+        if (TypeCoercion.TryCoerce(this, other, out var commonType, out var a, out var b)) {
+            switch (commonType) {
+                case RTVT.Int32:  return ((int) a <= (int) b);
+                case RTVT.Int64:  return ((long) a <= (long) b);
+                case RTVT.Float:  return ((float) a <= (float) b);
+                case RTVT.Double: return ((double) a <= (double) b);
+                case RTVT.String: return string.Compare((string) a, (string) b, StringComparison.Ordinal) <= 0;
+            }
         }
-        if (DispatchCall("__lte", [other], out var result)) {
+
+        if (DispatchCall(OperatorType.LessThanOrEqual, [other], out var result)) {
             return result;
         }
-        throw new InvalidCastException($"Cannot LessThanEqual {Type} and {other.Type}");
+
+        throw new InterpreterRuntimeException($"Cannot LessThanEqual {Type} and {other.Type}");
     }
 
     #endregion
@@ -461,23 +495,21 @@ public partial class Value
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Value Operator_GreaterThan(Value other) {
-        if (Is.Int32 && other.Is.Int32) return As.Int32() > other.As.Int32();
-        if (Is.Int64 && other.Is.Int64) return As.Long() > other.As.Long();
-        if (Is.Float && other.Is.Float) return As.Float() > other.As.Float();
-        if (Is.Double && other.Is.Double) return As.Double() > other.As.Double();
-
-        return Dispatch_Operator_GreaterThan(other);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Value Dispatch_Operator_GreaterThan(Value other) {
-        if (Is.String && other.Is.String) {
-            return string.Compare(As.String(), other.As.String(), StringComparison.Ordinal) > 0;
+        if (TypeCoercion.TryCoerce(this, other, out var commonType, out var a, out var b)) {
+            switch (commonType) {
+                case RTVT.Int32:  return ((int) a > (int) b);
+                case RTVT.Int64:  return ((long) a > (long) b);
+                case RTVT.Float:  return ((float) a > (float) b);
+                case RTVT.Double: return ((double) a > (double) b);
+                case RTVT.String: return string.Compare((string) a, (string) b, StringComparison.Ordinal) > 0;
+            }
         }
-        if (DispatchCall("__gt", [other], out var result)) {
+
+        if (DispatchCall(OperatorType.GreaterThan, [other], out var result)) {
             return result;
         }
-        throw new InvalidCastException($"Cannot GreaterThan {Type} and {other.Type}");
+
+        throw new InterpreterRuntimeException($"Cannot GreaterThan {Type} and {other.Type}");
     }
 
     #endregion
@@ -489,24 +521,20 @@ public partial class Value
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Value Operator_GreaterThanEqual(Value other) {
-        if (Is.Int32 && other.Is.Int32) return As.Int32() >= other.As.Int32();
-        if (Is.Int64 && other.Is.Int64) return As.Long() >= other.As.Long();
-        if (Is.Float && other.Is.Float) return As.Float() >= other.As.Float();
-        if (Is.Double && other.Is.Double) return As.Double() >= other.As.Double();
-
-
-        return Dispatch_Operator_GreaterThanEqual(other);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Value Dispatch_Operator_GreaterThanEqual(Value other) {
-        if (Is.String && other.Is.String) {
-            return string.Compare(As.String(), other.As.String(), StringComparison.Ordinal) >= 0;
+        if (TypeCoercion.TryCoerce(this, other, out var commonType, out var a, out var b)) {
+            switch (commonType) {
+                case RTVT.Int32:  return ((int) a >= (int) b);
+                case RTVT.Int64:  return ((long) a >= (long) b);
+                case RTVT.Float:  return ((float) a >= (float) b);
+                case RTVT.Double: return ((double) a >= (double) b);
+                case RTVT.String: return string.Compare((string) a, (string) b, StringComparison.Ordinal) >= 0;
+            }
         }
-        if (DispatchCall("__gte", [other], out var result)) {
+
+        if (DispatchCall(OperatorType.GreaterThanOrEqual, [other], out var result)) {
             return result;
         }
-        throw new InvalidCastException($"Cannot GreaterThanEqual {Type} and {other.Type}");
+        throw new InterpreterRuntimeException($"Cannot GreaterThanEqual {Type} and {other.Type}");
     }
 
     #endregion
@@ -521,14 +549,13 @@ public partial class Value
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Value Operator_ConditionalNot() {
         if (Is.Boolean)
-            return !As.Bool();
+            return !GetUntypedValue<bool>();
 
-        return Dispatch_Operator_ConditionalNot();
-    }
+        if (TypeCoercion.CastTo(this, RTVT.Boolean, out var casted)) {
+            return !casted.GetUntypedValue<bool>();
+        }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Value Dispatch_Operator_ConditionalNot() {
-        if (DispatchCall("__cond_not", [], out var result)) {
+        if (DispatchCall(OperatorType.Not, [], out var result)) {
             return result;
         }
 
@@ -541,22 +568,49 @@ public partial class Value
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Value Operator_ConditionalAnd(Value other) {
-        if (Is.Boolean && other.Is.Boolean)
-            return As.Bool() && other.As.Bool();
+        var (commonType, vals) = TypeCoercion.GetCommonType(this, other);
 
-        return Dispatch_Operator_ConditionalAnd(other);
-    }
+        switch (commonType) {
+            case RTVT.Int32:
+            case RTVT.Int64:
+            case RTVT.Float:
+            case RTVT.Double:
+            case RTVT.String:
+            case RTVT.Boolean: {
+                var a = vals.a.CastTo(RTVT.Boolean);
+                // if the first operand is false, return false
+                if (!a) {
+                    return False();
+                }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Value Dispatch_Operator_ConditionalAnd(Value other) {
-        if (DispatchCall("__cond_and", [other], out var result)) {
+                // Short-circuiting passed; evaluate the second operand
+                var b = vals.b.CastTo(RTVT.Boolean);
+                return b ? True() : False();
+            }
+        }
+
+        if (DispatchCall(OperatorType.And, [other], out var result)) {
             return result;
         }
 
-        if (IsTruthy() && other.IsTruthy()) {
-            return True();
+        throw new InterpreterRuntimeException($"Cannot eval ({Type} && {other.Type})");
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Value Operator_BitwiseAnd(Value other) {
+        if (TypeCoercion.TryCoerce(this, other, out var commonType, out var a, out var b)) {
+            switch (commonType) {
+                case RTVT.Int32:   return ((int) a & (int) b);
+                case RTVT.Int64:   return ((long) a & (long) b);
+                case RTVT.Boolean: return ((bool) a && (bool) b);
+            }
         }
-        return False();
+
+        if (DispatchCall(OperatorType.BitwiseAnd, [other], out var result)) {
+            return result;
+        }
+
+        throw new InterpreterRuntimeException($"Cannot eval ({Type} & {other.Type})");
     }
 
     #endregion
@@ -565,17 +619,16 @@ public partial class Value
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Value Operator_ConditionalOr(Value other) {
-        if (Is.Boolean && other.Is.Boolean)
-            return As.Bool() || other.As.Bool();
+        if (TypeCoercion.TryCoerce(this, other, out var commonType, out var a, out var b)) {
+            switch (commonType) {
+                case RTVT.Int32:   return ((int) a | (int) b);
+                case RTVT.Int64:   return ((long) a | (long) b);
+                case RTVT.String:  return string.Compare((string) a, (string) b, StringComparison.Ordinal) >= 0;
+                case RTVT.Boolean: return ((bool) a || (bool) b);
+            }
+        }
 
-
-        return Dispatch_Operator_ConditionalOr(other);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Value Dispatch_Operator_ConditionalOr(Value other) {
-
-        if (DispatchCall("__cond_or", [other], out var result)) {
+        if (DispatchCall(OperatorType.Or, [other], out var result)) {
             return result;
         }
 
@@ -584,13 +637,50 @@ public partial class Value
 
     #endregion
 
+    private bool _suppressDispatch = false;
+    public UsingCallbackHandle SuppressDispatch() {
+        _suppressDispatch = true;
+        return new UsingCallbackHandle(() => _suppressDispatch = false);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [DebuggerStepThrough]
+    public bool DispatchCall(OperatorType op, Value[] args, out Value result)
+        => DispatchCall(op.GetOverloadFnName(), args, out result);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Value DispatchCall(ExecContext ctx, Value[] args)
+        => ctx.Call(this, this, args);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Value DispatchCall(ExecContext ctx, Value instance, Value[] args)
+        => ctx.Call(this, instance, args);
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool DispatchCall(string name, Value[] args, out Value result) {
+        if (_suppressDispatch) {
+            result = Null();
+            return false;
+        }
+
         // if (_context == null) {
         //     throw new InvalidOperationException("Cannot call a function without a context");
         // }
         if (Get_Field(name, RTVT.Function, out var fn)) {
-            result = fn.As.Fn().Call(_context, this, args);
+            // Add `this` as the first argument
+
+            System.Array.Resize(ref args, args.Length + 1);
+            System.Array.Copy(args, 0, args, 1, args.Length - 1);
+            args[0] = this;
+
+            var fnValue = fn.As.Fn();
+            //var fnContext = new FunctionExecContext(_context) {
+            //    Function = fnValue.Declaration,
+            //    This     = this,
+            //};
+
+            result = _context.Call(fn, this, args);
+            // result = fnValue.Call(fnContext, this, args);
             return true;
         }
 

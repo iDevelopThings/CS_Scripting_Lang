@@ -1,6 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using CSScriptingLang.Interpreter.Execution.Expressions;
 using CSScriptingLang.Parsing.AST;
+using CSScriptingLang.RuntimeValues.Types;
 using CSScriptingLang.RuntimeValues.Values;
 
 namespace CSScriptingLang.Interpreter.Context;
@@ -99,12 +100,31 @@ public class ExecStack<TKey, TValue, TUpdaterFuncValue> : Stack<ExecTable<TKey, 
     public void PopScope() {
         ScopeNames.Pop();
 
-        Pop();
+        var scope = Pop();
+        var table = scope.Table;
+        foreach (var (key, value) in table) {
+            if (value is VariableSymbol symbol) {
+                var val = symbol.Val;
+                if(val["_disposed"] == true) {
+                    continue;
+                }
+                
+                var disposeFn = val["dispose"];
+                if (disposeFn.Type == RTVT.Function) {
+                    disposeFn.As.Fn().Call(val._context, null);
+                }
+                
+                val["_disposed"] = true;
+                
+                table.Remove(key);
+            }
+        }
     }
 
     public TValue Get(TKey key) => Get(key, out var value) ? value : default;
     public bool Get(TKey key, out TValue value) {
-        foreach (var scope in this) {
+        var scopes = this.ToArray();
+        foreach (var scope in scopes) {
             if (scope.Get(key, out value)) {
                 return true;
             }

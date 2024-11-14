@@ -1,0 +1,12 @@
+async function runA() {
+    var i = 0
+    for {
+        // print('running A: {0}', i)
+        // await sleep(1000)
+        i++
+        
+        if(i > 5) {
+            break
+        }
+    }
+}

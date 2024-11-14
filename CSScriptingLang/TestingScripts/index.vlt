@@ -1,0 +1,20 @@
+﻿
+type Array struct
+{
+  def push(int pls, int plspsl) int32;
+  def removeAt(object index) int32;
+  def removeRange(object start, object end) int32;
+  def getEnumerator() object;
+    getBody() int {
+        print()
+    }
+
+}
+
+function main() {
+    var server = new<HttpServer>();
+    var r = server.getRouter();
+    var myServer = server;
+    // server is now a new instance of HttpServer
+}
+

@@ -1,22 +1,23 @@
-﻿using CSScriptingLang.Core;
-using CSScriptingLang.Interpreter.Bindings;
+﻿using System.Runtime.ExceptionServices;
+using CSScriptingLang.Core;
+using CSScriptingLang.Core.Async;
 using CSScriptingLang.Interpreter.Context;
 using CSScriptingLang.Interpreter.Coroutines;
 using CSScriptingLang.Interpreter.Execution.Expressions;
 using CSScriptingLang.Interpreter.Execution.Statements;
 using CSScriptingLang.Interpreter.Modules;
-using CSScriptingLang.Interpreter.SyntaxAnalysis;
-using CSScriptingLang.Lexing;
 using CSScriptingLang.Parsing.AST;
+using CSScriptingLang.IncrementalParsing.Syntax;
+using CSScriptingLang.IncrementalParsing.Syntax.SyntaxNodes;
 using CSScriptingLang.Utils;
 using CSScriptingLang.RuntimeValues.Types;
-using CSScriptingLang.RuntimeValues.Values;
+using DeferStatement = CSScriptingLang.Interpreter.Execution.Statements.DeferStatement;
 
 namespace CSScriptingLang.Interpreter;
 
 public partial class Interpreter
 {
-    public ProgramExpression Program => Module?.MainScript?.AstData.Program;
+    public static Interpreter Instance { get; set; }
 
     // Should only be used for the repl/lsp
     public static ExecContext Ctx { get; set; }
@@ -31,107 +32,154 @@ public partial class Interpreter
         ModuleResolver = new ModuleResolver(FileSystem);
         Scheduler      = new Scheduler(this);
 
-        if (InterpreterConfig.Mode == InterpreterMode.Lsp) {
+        if (InterpreterConfig.Mode == InterpreterMode.Lsp && FileSystem == null)
+            Logger.Warning("Configuring Interpreter, but FileSystem is null");
+
+        if (InterpreterConfig.Mode == InterpreterMode.Lsp && FileSystem?.IsPhysical == true) {
             FileSystem.OnFileAdded += file => {
-                ModuleResolver.LoadFile(file);
+
+                var result = ModuleResolver.Resolve(
+                    Ctx,
+                    file.Path,
+                    true,
+                    true
+                );
+
+                if (result != null) { }
             };
         }
+
+        Instance = this;
+        Ctx      = GetNewExecContext();
+
     }
 
-    public ExecContext GetNewExecContext() => new(this);
+    public ExecContext GetOrCreateCtx(ExecContext ctx = null) {
+        ExecContext c = null;
+
+        if (ctx != null) {
+            if (Ctx == null || ctx != Ctx) {
+                Ctx = ctx;
+            }
+            c = Ctx;
+        } else {
+            c = Ctx ??= GetNewExecContext();
+        }
+
+        c.Interpreter = this;
+
+        return c;
+    }
+
+    public ExecContext GetNewExecContext() {
+        var ctx = new ExecContext(this);
+
+        TypesTable.Initialize(ctx);
+
+        ctx.Libraries.OnPreLoad += collection => { };
+
+        return ctx;
+    }
 
     public ExecContext Initialize(ExecContext ctx = null) {
         using var _ = Timer.NewWith("Initialization".Bold());
 
-        ctx             ??= GetNewExecContext();
-        ctx.Interpreter =   this;
-
-        NativeBinder.BindNativeFunctions(ctx);
+        ctx = GetOrCreateCtx(ctx);
 
         Module ??= ModuleResolver.MainModule;
 
         return ctx;
     }
 
-    /// <summary>
-    /// Mainly used in `LanguageTests.BaseCompilerTest` for manually setting up the interpreter with it's rules
-    /// </summary>
-    public ExecContext ExecuteStandalone(ExecContext ctx = null) {
-        ctx             ??= GetNewExecContext();
-        ctx.Interpreter =   this;
+    public ExecContext Execute(ExecContext ctx, string scriptPath, Action onBeforeExecuteProgram = null) {
+        ctx = GetOrCreateCtx(ctx);
 
-        NativeBinder.BindNativeFunctions(ctx);
+        var (exports, script) = ModuleResolver.ResolveEntryScript(ctx, scriptPath);
 
-        Module ??= ModuleResolver.MainModule;
-
-        ctx.Libraries.OnPreLoad += collection => {
-            TypesTable.Initialize();
-        };
-        ctx.Libraries.Load(ctx, collection => {
-            Logger.Info("Loading libraries");
-        });
-
-        // TypeAnalyzer.TypeCheck(Program, ctx);
-
-        ExecuteProgram(Program, ctx);
-
-        return ctx;
+        return ExecuteScript(ctx, script, onBeforeExecuteProgram);
     }
 
-    /// <summary>
-    /// Does the full initialization process required to execute the program
-    /// </summary>
-    public ExecContext Execute(ExecContext ctx = null, Action onBeforeExecuteProgram = null) {
-        ctx             ??= GetNewExecContext();
-        ctx.Interpreter ??= this;
+    public ExecContext ExecuteScript(ExecContext ctx, Script script, Action onBeforeExecuteProgram = null) {
+        ctx = GetOrCreateCtx(ctx);
 
-        NativeBinder.BindNativeFunctions(ctx);
+        Script = script;
+        Module = ctx.Module = Script.Module;
 
-        ModuleResolver.Load(ctx);
-
-        Module     ??= ModuleResolver.MainModule;
-        ctx.Module =   ModuleResolver.MainModule;
-
-        ctx.Libraries.OnPreLoad += collection => {
-            TypesTable.Initialize();
-        };
-        ctx.Libraries.Load(ctx, collection => {
-            Logger.Info("Loading libraries");
-        });
-
-        TypeAnalyzer.TypeCheck(Program, ctx);
+        Ctx.Libraries.Load(
+            Ctx, collection => {
+                Logger.Info("Loading libraries");
+            }
+        );
 
         onBeforeExecuteProgram?.Invoke();
 
-        ExecuteProgram(Program, ctx);
+        /*if (InterpreterConfig.WatchRootDirectory) {
+            script.File.OnChanged += file => {
+                ScriptTask.CancelAll();
+
+                Execute(ctx, script.RelativePath, onBeforeExecuteProgram);
+            };
+        }*/
+
+        var runNext = false;
+        if (InterpreterConfig.WatchRootDirectory) {
+            script.File.OnChanged += file => {
+                script.File.OnChanged = null;
+                runNext               = true;
+                ScriptTask.CancelAll();
+            };
+        }
+
+        var task = Task.Factory.StartNew(
+            () => {
+                if (InterpreterConfig.ExecMode == InterpreterExecMode.Original)
+                    ExecuteProgram(Script.Program, ctx);
+                else if (InterpreterConfig.ExecMode == InterpreterExecMode.IncrementalSyntaxTree)
+                    ExecuteTree(Script.SyntaxTree, ctx);
+            }
+        );
+
+
+        try {
+            task.Wait();
+        }
+        catch (OperationCanceledException) {
+            return Execute(ctx, script.RelativePath, onBeforeExecuteProgram);
+        }
+        catch (AggregateException e) {
+            ExceptionDispatchInfo.Capture(e.InnerExceptions.Count != 1 ? e : e.InnerException ?? e).Throw();
+        }
+        catch (Exception e) {
+            ExceptionDispatchInfo.Capture(e).Throw();
+        }
+
+        if (runNext) {
+            Configure(FileSystem);
+
+            return Execute(Ctx, script.RelativePath, onBeforeExecuteProgram);
+        }
 
         return ctx;
     }
 
-
     public ExecResult ExecuteProgram(ProgramExpression node, ExecContext ctx) {
-        using var _ = Timer.NewWith("Execute Program".BoldBrightGreen());
+        using var _      = Timer.NewWith("Execute Program".BoldBrightGreen());
+        var       result = NewResult();
+        node.Execute(ctx, false);
+        return result;
+    }
+    public ExecResult ExecuteTree(SyntaxTree tree, ExecContext ctx) {
+        using var _      = Timer.NewWith("Execute Tree".BoldBrightGreen());
+        var       result = NewResult();
+        var       root   = tree.SyntaxRoot;
 
-        var result = NewResult();
+        var resultItem = root.DoExecuteMulti(ctx).ToList();
 
-        ctx.OnBeforeExecuteProgram?.Invoke(ctx);
-
-        node.Execute(ctx);
-        
-        /*
-        foreach (var n in node.Nodes) {
-            Execute(n, ctx);
-
-            Scheduler.Tick();
-        }
-
-        while (Scheduler.HasActiveCoroutines()) {
-            Scheduler.Tick();
-        }
-        */
+        result += resultItem.FirstOrDefault();
 
         return result;
     }
+
     public ExecResult ExecuteNodes(IEnumerable<BaseNode> nodes, ExecContext ctx) {
         var nodeList = nodes.ToList();
 
@@ -140,7 +188,7 @@ public partial class Interpreter
         var result = NewResult();
 
         foreach (var n in nodeList) {
-            result += Execute(n, ctx);
+            // result += Execute(n, ctx);
 
             Scheduler.Tick();
         }
@@ -152,14 +200,14 @@ public partial class Interpreter
         return result;
     }
 
-    public ExecResult Execute(BaseNode node, ExecContext ctx) {
+    /*public ExecResult Execute(BaseNode node, ExecContext ctx) {
         ExecResult result;
 
         switch (node) {
-            case SignalDeclarationNode n:
+            case SignalDeclaration n:
                 result = Execute(n, ctx);
                 break;
-            
+
             case BlockExpression n: {
                 result = NewResult();
                 n.Execute(ctx);
@@ -191,7 +239,7 @@ public partial class Interpreter
             case IfStatementNode n:
                 return NewResult(n.Execute(ctx));
 
-            case ForRangeStatement n: 
+            case ForRangeStatement n:
                 return NewResult(n.Execute(ctx));
             case ForLoopStatement n:
                 return NewResult(n.Execute(ctx));
@@ -210,62 +258,7 @@ public partial class Interpreter
         }
 
         return result;
-    }
-
-    private ExecResult Execute(SignalDeclarationNode node, ExecContext ctx) {
-        var result = NewResult();
-
-        if (node.Type == null) {
-            node.Type = TypeTable.RegisterSignalType(node.Name, null);
-            node.TypeAs<RuntimeTypeInfo_Signal>().Parameters.AddRange(node.Parameters.Arguments.Select(p => {
-                p.Type ??= TypeTable.Get(p.TypeName);
-
-                return new RuntimeTypeInfo_Signal.Parameter() {
-                    Name = p.Name,
-                    Type = p.Type
-                };
-            }));
-        }
-
-        var symbol = ctx.Variables.Declare(node.Name);
-        // var signal = new ValueSignal(symbol, node);
-
-        var signal = Value.Signal();
-        symbol.Val = signal;
-
-        return result;
-    }
+    }*/
 
 
-    private ExecResult ExecuteOp(
-        Value        left,
-        OperatorType op,
-        Value        right,
-        ExecContext  ctx
-    ) {
-        var result = NewResult();
-
-        if (left != null) {
-            var opResult = left.Operator(op, right);
-            result += opResult;
-            return result;
-        }
-
-        return result;
-    }
-
-
-    public ExecResult ExecuteBlock(
-        BlockExpression   node,
-        ExecContext ctx,
-        bool        pushScope            = true,
-        Action      onBeforeExecuteBlock = null,
-        Action      onAfterExecuteBlock  = null
-    ) {
-        var result = NewResult();
-
-  
-
-        return result;
-    }
 }

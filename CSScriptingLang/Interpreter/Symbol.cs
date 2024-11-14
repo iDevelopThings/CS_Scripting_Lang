@@ -9,7 +9,8 @@ public class VariableSymbol
 {
     public string Name { get; set; }
 
-    public Value Val { get; set; }
+    public Value Val  { get; set; }
+    public RTVT  Type => Val?.Type ?? RTVT.Null;
 
     public VariableSymbol Reference { get; set; }
 
@@ -49,12 +50,16 @@ public class Symbol
     private readonly long Id;      // Unique ID for each symbol
 
     public string Name { get; }
+    public Symbol Parent { get; set; }
 
     private static Dictionary<string, Symbol> Registry { get; set; } = new();
 
     private Symbol(string name) {
         Id   = ++Counter;
         Name = name;
+    }
+    private Symbol(string name, Symbol parent) : this(name) {
+        Parent = parent;
     }
 
     // Factory method for creating new symbols
@@ -71,6 +76,11 @@ public class Symbol
 
         return value;
     }
+    
+    public Symbol Child(string name) {
+        var n = $"{Name}.{name}";
+        return new Symbol(n, this);
+    }
 
     public override bool Equals(object obj) {
         if (obj is Symbol otherSymbol) {
@@ -85,6 +95,9 @@ public class Symbol
     }
 
     public override string ToString() {
-        return Name != null ? $"Symbol({Name})" : $"Symbol()";
+        if(Name == null)
+            throw new NullReferenceException("Name is null");
+
+        return $"Symbol({Name})";
     }
 }

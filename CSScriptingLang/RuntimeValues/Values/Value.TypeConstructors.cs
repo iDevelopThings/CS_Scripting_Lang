@@ -1,10 +1,13 @@
 ﻿using System.Diagnostics;
 using CSScriptingLang.Common.Extensions;
+using CSScriptingLang.Core.Async;
 using CSScriptingLang.Interpreter.Context;
 using CSScriptingLang.Interpreter.Execution.Expressions;
 using CSScriptingLang.Lexing;
-using CSScriptingLang.Parsing.AST;
+using CSScriptingLang.IncrementalParsing.Syntax.SyntaxNodes;
 using CSScriptingLang.RuntimeValues.Types;
+using CSScriptingLang.Utils;
+using CSScriptingLang.Utils.ReflectionUtils;
 
 namespace CSScriptingLang.RuntimeValues.Values;
 
@@ -22,19 +25,25 @@ public class FnClosure
     public FnClosureType             Type        { get; set; }
     public string                    Name        { get; set; }
     public InlineFunctionDeclaration Declaration { get; set; }
+    public FunctionDecl              Decl        { get; set; }
+    public Frame                     Frame       { get; set; }
 
-
-    public delegate Value StaticFunction(FunctionExecContext      ctx, params Value[] arguments);
-    public delegate Value InstanceFunction(FunctionExecContext    ctx, Value          instance, params Value[] arguments);
-    public delegate Value InstanceGetterFunction(ExecContext      ctx, Value          instance);
-    public delegate Value InterpretedFunction(FunctionExecContext ctx, Value          instance, params Value[] arguments);
+    public delegate Value              StaticFunction(FunctionExecContext         ctx, params Value[] arguments);
+    public delegate Value              InstanceFunction(FunctionExecContext       ctx, Value          instance, params Value[] arguments);
+    public delegate Value              InstanceGetterFunction(ExecContext         ctx, Value          instance);
+    public delegate Value              InterpretedFunction(FunctionExecContext    ctx, Value          instance, params Value[] arguments);
+    public delegate IEnumerable<Value> InterpretedSeqFunction(FunctionExecContext ctx, Value          instance, params Value[] arguments);
 
     public StaticFunction         StaticCallable   { get; set; }
     public InstanceFunction       InstanceCallable { get; set; }
     public InstanceGetterFunction InstanceGetter   { get; set; }
     public InterpretedFunction    Interpreted      { get; set; }
+    public InterpretedSeqFunction InterpretedSeq   { get; set; }
 
+    public Func<Value> OnGetValue { get; set; }
 
+    public bool IsAsync { get; set; }
+    public bool IsSeq   { get; set; }
 
     public FnClosure() { }
 
@@ -42,6 +51,15 @@ public class FnClosure
         Declaration = declaration;
         Name        = declaration.Name;
         Type        = FnClosureType.Interpreted;
+        IsAsync     = declaration.IsAsync;
+        IsSeq       = declaration.IsSeq;
+    }
+    public FnClosure(FunctionDecl declaration) {
+        Decl    = declaration;
+        Name    = declaration.Name;
+        Type    = FnClosureType.Interpreted;
+        IsAsync = declaration.IsAsync;
+        IsSeq   = declaration.IsSeq;
     }
     public FnClosure(StaticFunction callable, string name = null) {
         StaticCallable = callable;
@@ -60,23 +78,104 @@ public class FnClosure
     }
 
     public Value Call(ExecContext ctx, Value instance, params Value[] arguments) {
-        return Type switch {
+        /*if (Type == FnClosureType.Interpreted && IsAsync) {
+            var promise = new AsyncPromise(ctx, ctx.CurrentCallFrame, OnGetValue());
+
+            var result = Value.Object(ctx);
+            result.DataObject = promise;
+
+            return AsyncContext.Library.GlobalInstance.Execute(
+                result,
+                promise,
+                () => Interpreted((FunctionExecContext) ctx, instance, arguments)
+            );
+        }*/
+
+        if (Type == FnClosureType.Interpreted && IsAsync) {
+            var t = new ScriptTask(
+                async () => {
+                    return await Task.Run(() => Interpreted((FunctionExecContext) ctx, instance, arguments));
+                }
+            );
+
+            return t.Wrap(ctx);
+        }
+
+        /*
+        if (Type == FnClosureType.Interpreted && IsSeq) {
+            var enumerator = Value.Object(ctx);
+            enumerator["current"] = Value.Null();
+            enumerator["moveNext"] = Value.Function("moveNext", (_, args) => {
+                var result = Interpreted((FunctionExecContext) ctx, instance, arguments);
+                enumerator["current"] = result;
+                return result.Type != RTVT.Null;
+            });
+            enumerator["dispose"] = Value.Function("dispose", (_, args) => Value.Null());
+            return enumerator;
+        }
+        */
+
+        var returnValue = Type switch {
             FnClosureType.Static         => StaticCallable((FunctionExecContext) ctx, arguments),
             FnClosureType.Instance       => InstanceCallable((FunctionExecContext) ctx, instance, arguments),
             FnClosureType.InstanceGetter => InstanceGetter(ctx, instance),
             FnClosureType.Interpreted    => Interpreted((FunctionExecContext) ctx, instance, arguments),
             _                            => throw new InterpreterRuntimeException("Invalid function type")
         };
+
+        // if(returnValue?.DataObject is AsyncPromise p) {          
+        //     return AsyncContext.Library.GlobalInstance.Execute(
+        //         returnValue,
+        //         p,
+        //         () => returnValue
+        //     );
+        // }
+
+        return returnValue;
     }
+
+    /*public Value Invoke(params Value[] arguments) {
+        var val   = OnGetValue?.Invoke();
+        var ctx   = val?._context;
+        var fnCtx = ctx as FunctionExecContext;
+        if (fnCtx == null && ctx == null && Type != FnClosureType.Static)
+            throw new InterpreterRuntimeException("Context is null; all object values must be created with a context");
+
+        if (fnCtx == null && ctx != null) {
+            fnCtx = new FunctionExecContext(ctx) {
+                This = val
+            };
+        }
+
+        return Type switch {
+            FnClosureType.Static         => StaticCallable(fnCtx, arguments),
+            FnClosureType.Instance       => InstanceCallable(fnCtx, val, arguments),
+            FnClosureType.InstanceGetter => InstanceGetter(fnCtx, val),
+            FnClosureType.Interpreted    => Interpreted(fnCtx, val, arguments),
+            _                            => throw new InterpreterRuntimeException("Invalid function type")
+        };
+    }*/
 
 }
 
 public partial class Value
 {
-    private ExecContext _context;
+    public ExecContext _context;
 
-    public static Value Unit(params  object[] args) => new() {Type = RTVT.Unit};
-    public static Value Null(params  object[] args) => new() {Type = RTVT.Null};
+    public static Value Unit(params object[] args) {
+        var val = new Value {
+            Type = RTVT.Unit,
+        };
+        val["__callerContext"] = Caller.GetFromFrame(2).ToString();
+        return val;
+    }
+    public static Value Null(params object[] args) {
+        var val = new Value {
+            Type = RTVT.Null,
+        };
+        val["__callerContext"] = Caller.GetFromFrame(2).ToString();
+        return val;
+    }
     public static Value True(params  object[] args) => new(true);
     public static Value False(params object[] args) => new(false);
 
@@ -134,11 +233,7 @@ public partial class Value
                 // Prototype = SignalPrototype.Instance;
                 break;
             }
-            case RTVT.Struct: {
-                value = Type.ZeroValue();
-                // Prototype = ObjectPrototype.Instance;
-                break;
-            }
+            case RTVT.Struct:
             case RTVT.Object:
                 // Prototype = ObjectPrototype.Instance;
                 // Object uses `Members` for it's value
@@ -165,7 +260,10 @@ public partial class Value
         InitializeFromType(type, prototype);
     }
     protected Value(RTVT type, ExecContext ctx, Value prototype = null) : this(type, prototype) {
-        _context = ctx ?? throw new ArgumentNullException(nameof(ctx));
+        // if(_context == null && !TypesTable.IsBindingPrototypes)
+        //     throw new InterpreterRuntimeException("Context is null; all object values must be created with a context");
+
+        _context = ctx;
     }
 
     protected Value(int v) : this(RTVT.Int32) {
@@ -189,7 +287,8 @@ public partial class Value
     }
 
     protected Value(FnClosure v) : this(RTVT.Function) {
-        value = v;
+        v.OnGetValue = () => this;
+        value        = v;
     }
 
     protected Value(bool v) : this(RTVT.Boolean) {
@@ -197,14 +296,15 @@ public partial class Value
     }
 
     protected Value(IEnumerable<Value> v) : this(RTVT.Array) {
-        if (ReferenceEquals(v, null))
-            throw new ArgumentNullException(nameof(v));
-
-        As.List().AddRange(v);
+        if (!ReferenceEquals(v, null)) {
+            As.List().AddRange(v);
+        }
     }
 
     public static Value Make(object value) {
         return value switch {
+            Value v => v,
+
             int i                                      => Number(i),
             long l                                     => Number(l),
             float f                                    => Number(f),
@@ -223,7 +323,7 @@ public partial class Value
         };
     }
     public static Value Make(RTVT type) => new(type);
-    
+
     [DebuggerStepThrough]
     public static bool TryMakeFromName(ExecContext ctx, string name, out Value type, params object[] args) {
         return TypesTable.TryMakeFromName(ctx, name, out type, args);
@@ -254,21 +354,9 @@ public partial class Value
 
     public static Value Boolean(bool value) => new(value);
 
-    public static Value String(object value) => value switch {
-        string s => new Value(s),
-        _        => throw new InterpreterRuntimeException("Invalid string type")
-    };
-    public static Value String(string value) => new(value);
+    public static Value String(string          value) => new(value ?? string.Empty);
+    public static Value String(params object[] args)  => String((string) (args?.FirstOrDefault() ?? string.Empty));
 
-    public static Value Function(params object[] args) => args.Length switch {
-        0 => new Value(new FnClosure()),
-        1 => args[0] switch {
-            InlineFunctionDeclaration declaration => Function(declaration),
-            FnClosure closure                     => Function(closure),
-            _                                     => throw new InterpreterRuntimeException("Invalid arguments")
-        },
-        _ => throw new InterpreterRuntimeException("Invalid arguments")
-    };
     public static Value Function(string name, FnClosure.StaticFunction value) {
         if (ReferenceEquals(value, null))
             throw new ArgumentNullException(nameof(value));
@@ -295,55 +383,104 @@ public partial class Value
     }
     public static Value Function(FnClosure value) => new(value);
 
+    public static Value Function(params object[] args) => args.Length switch {
+        0 => new Value(new FnClosure()),
+        1 => args[0] switch {
+            InlineFunctionDeclaration declaration => Function(declaration),
+            FnClosure closure                     => Function(closure),
+            _                                     => throw new InterpreterRuntimeException("Invalid arguments")
+        },
+        _ => throw new InterpreterRuntimeException("Invalid arguments"),
+    };
     public static Value Object(params object[] args) {
         if (args?.Length == 0 || args is null)
             throw new InterpreterRuntimeException("Invalid arguments");
 
         var ctx = args.OfType<ExecContext>().FirstOrDefault();
 
-        return args[0] switch {
-            IEnumerable<(string, Value)> enumerable               => Object(enumerable, ctx),
-            IEnumerable<KeyValuePair<string, Value>> enumerableKv => Object(enumerableKv, ctx),
+        if (args[0] is IEnumerable<(string, Value)> enumerable) {
+            return Object(enumerable, ctx);
+        }
+        if (args[0] is IEnumerable<KeyValuePair<string, Value>> enumerableKv) {
+            return Object(enumerableKv, ctx);
+        }
+        if (args[0] is KeyValuePair<string, Value> kv) {
+            return Object(
+                new Dictionary<string, Value>() {
+                    {"key", kv.Key},
+                    {"value", kv.Value},
+                }, ctx
+            );
+        }
 
-            _ => throw new InterpreterRuntimeException("Invalid arguments")
-        };
+        // detect anonymous object instance
+        if (args[0] is not null) {
+            var obj  = args[0];
+            var type = obj.GetType();
+            if (type.IsAnonymousType()) {
+                // convert anonymous object to dictionary
+                Dictionary<string, Value> dict = type.GetProperties().ToDictionary(
+                    prop => prop.Name,
+                    prop => Make(prop.GetValue(obj))
+                );
+                return Object(dict, ctx);
+            }
+
+        }
+
+        throw new InterpreterRuntimeException("Invalid arguments");
     }
-    public static Value Object(ExecContext ctx = null) => new(RTVT.Object, ctx);
-    public static Value Object(IEnumerable<(string, Value)> entries, ExecContext ctx = null) {
-        var value = Object(ctx);
+    public static Value Object(ExecContext ctx = null, Value prototype = null) => new(RTVT.Object, ctx, prototype);
+    public static Value Object(IEnumerable<(string, Value)> entries, ExecContext ctx = null, Value prototype = null) {
+        var value = Object(ctx, prototype);
         value.Members.AddRange(entries);
         return value;
     }
-    public static Value Object(IEnumerable<KeyValuePair<string, Value>> entries, ExecContext ctx = null) {
-        var value = Object(ctx);
+    public static Value Object(IEnumerable<KeyValuePair<string, Value>> entries, ExecContext ctx = null, Value prototype = null) {
+        var value = Object(ctx, prototype);
+        value.Members.AddRange(entries);
+        return value;
+    }
+    public static Value Object(Dictionary<string, Value> entries, ExecContext ctx = null, Value prototype = null) {
+        var value = Object(ctx, prototype);
         value.Members.AddRange(entries);
         return value;
     }
     public static Value Struct(params object[] args) => args.Length switch {
         1 => args[0] switch {
             ExecContext ctx => Struct(ctx),
-
-            _ => throw new InterpreterRuntimeException("Invalid arguments")
+            _               => throw new InterpreterRuntimeException("Invalid arguments")
+        },
+        2 => args[0] switch {
+            ExecContext ctx => Struct(ctx, args[1] as Value),
+            _               => throw new InterpreterRuntimeException("Invalid arguments")
         },
         _ => throw new InterpreterRuntimeException("Invalid arguments"),
     };
-    public static Value Struct(ExecContext ctx) => new(RTVT.Struct, ctx);
+    public static Value Struct(ExecContext ctx, Value prototype = null) {
+        return new Value(RTVT.Struct, ctx, prototype);
+    }
 
     public static Value Array(params object[] args) {
         if (args?.Length == 0)
             return Array();
-        if (args?.Length == 1 && args[0] is IEnumerable<Value> values)
+        if (args is [IEnumerable<Value> values])
             return Array(values);
+        if (args is [IEnumerator<Value> vals])
+            return Array((IEnumerable<Value>) vals);
+
         throw new InterpreterRuntimeException("Invalid arguments");
     }
     public static Value Array(IEnumerable<Value> values = null) => new(values);
 
     public static Value Signal(params object[] args) {
-        if (args?.Length == 0)
-            return Signal();
+
+        if (args.Length == 1 && args[0] is ExecContext ctx)
+            return Signal(ctx);
+
         throw new InterpreterRuntimeException("Invalid arguments");
     }
-    public static Value Signal() => new(RTVT.Signal);
+    public static Value Signal(ExecContext ctx) => new(RTVT.Signal, ctx);
 
     public static Value Reference(ValueReference reference) => new(RTVT.ValueReference) {
         value = reference,

@@ -1,15 +1,28 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using CSScriptingLangGenerators.Utils;
-using CSScriptingLangGenerators.Utils.CodeWriter;
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 
 namespace CSScriptingLangGenerators.Bindings;
 
 public partial class BindingsGenerator
 {
-    private static List<(IMethodSymbol Method, string Name, string Identifier)> GetInstanceGetters(GeneratorExecutionContext context, INamedTypeSymbol klass, bool? isStatic = null) {
+    private static void PrototypeBindings(
+        GeneratorExecutionContext context,
+        INamedTypeSymbol          prototype,
+        PrototypeTypeData         typeData
+    ) {
+        typeData.WriteDefinitions();
+
+        using (typeData.B("public partial class PrototypeObject : IPrototypeObjectBinding")) {
+            typeData.WriteBuildToMethod();
+            typeData.WriteBuildMethod();
+            typeData.WriteGetDefinitions();
+
+            typeData.WritePropertyDefinitions();
+            typeData.WriteMethodDefinitions(true, true);
+        }
+
+    }
+
+    /*private static List<(IMethodSymbol Method, string Name, string Identifier)> GetInstanceGetters(GeneratorExecutionContext context, INamedTypeSymbol klass, bool? isStatic = null) {
         var result = new List<(IMethodSymbol, string, string)>();
 
         foreach (var member in klass.GetMembers()) {
@@ -35,27 +48,39 @@ public partial class BindingsGenerator
 
         return result;
     }
+    private static void PrototypeBindingsOld(
+        GeneratorExecutionContext context,
+        INamedTypeSymbol          prototype,
+        PrototypeTypeData         typeData
+    ) {
+        var writer = typeData;
 
-
-    private static void PrototypeBindings(GeneratorExecutionContext context, INamedTypeSymbol prototype, Writer writer) {
         var prototypeName = prototype.GetAttributeArgument<string>(Attributes.Prototype, prototype.Name);
+        var prototypeRtvt = prototype.GetAttributeArgument<int>(Attributes.Prototype, 0, 1);
         var properties    = GetProperties(context, prototype, true).ToList();
         var methods       = GetMethods(context, prototype, true);
-
+        var constructors  = GetConstructors(context, prototype, true);
         var methodTables = MethodData.Build(
-            context, methods
-            // methods.Concat(instanceGetters.Select(x => (x.Method, x.Name, x.Identifier)))
+            context,
+            methods.Concat(constructors.Select(c => (c, "#ctor", "__ctor")))
         );
-
         var instanceGetters = GetInstanceGetters(context, prototype, true);
         var instanceTables  = MethodData.Build(context, instanceGetters);
 
-        using (writer.B("private sealed class PrototypeObject")) {
 
-            using (writer.B($"public static Value BuildTo(Value obj, {prototype} protoDef, Value basePrototype = null)")) {
-                
+        writer._("public static PrototypeObject MainBuilder = new PrototypeObject();");
+        writer._("public PrototypeObject Builder {get; set;} = MainBuilder;");
+
+        // Only write if the prototype doesn't have a default constructor
+        if (prototype.GetConstructors().Any(c => c.Parameters.Length == 0)) {
+            writer._($"public {prototype.Name}() {{ throw new InterpreterRuntimeException($\"{{GetType().Name}} cannot be constructed without an ExecContext\"); }}");
+        }
+
+        using (writer.B("public partial class PrototypeObject : IPrototypeObjectBinding")) {
+            using (writer.B($"public Value BuildTo(Value obj, Prototype protoDef, Value basePrototype = null)")) {
+
                 writer._($"obj[\"symbolName\"] = Value.String(protoDef.Symbol.Name);");
-                
+
                 foreach (var property in properties) {
                     if (property.GetMethod != null) {
                         writer._($"obj[\"get{property.Name}\"] = Value.Function(\"{property.Name}\", {property.Name}__Getter);");
@@ -71,7 +96,7 @@ public partial class BindingsGenerator
                 foreach (var table in instanceTables) {
 
                     var method = table.GetFirstMethod();
-                    
+
                     // writer._($"var value = {qualifier}.{property.Name};");
                     // writer._($"return {ConvertToValue(context, "value", property.Type, property.Property)};");
                     using (writer.B($"Value __get_{method.Identifier}(ExecContext ctx, Value instance)")) {
@@ -103,17 +128,50 @@ public partial class BindingsGenerator
                 writer._("return obj;");
             }
 
-            using (writer.B($"public static Value Build({prototype} protoDef, Value basePrototype = null)")) {
-                writer._("var result = Value.Object();");
+            using (writer.B($"public Value Build(Prototype protoDef, ExecContext ctx, Value basePrototype = null)")) {
+                writer._("var result = Value.Object(ctx);");
                 writer._();
                 writer._("result = BuildTo(result, protoDef, basePrototype);");
                 writer._("result.Lock();");
                 writer._("return result;");
             }
 
-            writer._();
+            using (writer.B("public IEnumerable<KeyValuePair<string, Value>> GetDefinitions(ExecContext ctx)")) {
+
+                foreach (var table in methodTables) {
+                    if (!table.IsGlobal)
+                        continue;
+
+                    writer._("yield return new KeyValuePair<string, Value>");
+                    using (writer.I("(", ");")) {
+                        writer._($"\"{table.Name}\",");
+                        writer._("Value.Function");
+                        using (writer.I("(", ")")) {
+                            writer._($"\"{table.Identifier}\",");
+                            writer._($"{table.Identifier}__Dispatch");
+                        }
+                    }
+                }
+
+                if (constructors.Count > 0) {
+                    writer._("yield return new KeyValuePair<string, Value>");
+                    using (writer.I("(", ");")) {
+                        writer._($"\"{prototypeName}\",");
+                        writer._("Value.Function");
+                        using (writer.I("(", ")")) {
+                            writer._($"\"{prototypeName}__ctor\",");
+                            writer._("__ctor__Dispatch");
+                        }
+                    }
+
+                }
+
+                writer._("yield break;");
+            }
+
 
             var qualifier = $"global::{prototype.GetFullyQualifiedName()}";
+
 
             foreach (var property in properties) {
                 if (property.GetMethod != null) {
@@ -144,7 +202,10 @@ public partial class BindingsGenerator
             }
 
             foreach (var table in methodTables) {
-                using (writer.B($"private static Value {table.Identifier}__Dispatch(FunctionExecContext ctx, Value instance, params Value[] args)")) {
+                var isNormalMethod = table.Name != "#ctor";
+                using (writer.B($"public static Value {table.Identifier}__Dispatch(FunctionExecContext ctx, Value instance, params Value[] args)"
+                           /*$"private static Value {table.Identifier}__Dispatch(FunctionExecContext ctx, Value instance, params Value[] args)"#1#
+                       )) {
 
                     using (writer.B("switch (args.Length)")) {
                         for (var i = 0; i < table.Methods.Count; i++) {
@@ -185,5 +246,11 @@ public partial class BindingsGenerator
             }
 
         }
-    }
+
+        writer._();
+
+        // outerWriter.Write(w);
+
+    }*/
+
 }

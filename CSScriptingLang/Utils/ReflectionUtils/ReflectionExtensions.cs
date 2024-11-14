@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace CSScriptingLang.Utils.ReflectionUtils;
 
@@ -7,6 +8,11 @@ public static class ReflectionExtensions
     private static readonly Func<PropertyInfo, bool> IsInstance       = (PropertyInfo property) => !((property.GetMethod ?? property.SetMethod)!).IsStatic;
     private static readonly Func<PropertyInfo, bool> IsInstancePublic = (PropertyInfo property) => IsInstance(property) && ((property.GetMethod ?? property.SetMethod)!).IsPublic;
 
+    public static bool IsAnonymousType(this Type type) {
+        return Attribute.IsDefined(type, typeof(CompilerGeneratedAttribute))
+            && type.IsGenericType
+            && (type.Name.Contains("AnonymousType") || type.Name.StartsWith("<>"));
+    }
     public static bool IsSubclassOfInclGenerics(this Type type, Type other) {
         // if (type.BaseType is {IsGenericType: true} && type.BaseType.GetGenericTypeDefinition() == typeof(GlobalSingletonSystemBase<>)) {
         if (type.BaseType() is {IsGenericType: true} && type.BaseType().GetGenericTypeDefinition() == other) {
@@ -81,34 +87,34 @@ public static class ReflectionExtensions
     public static object ReadValue(this PropertyInfo property, object target) {
         return property.GetValue(target, null);
     }
-    
+
     public static bool IsAsync(this MethodInfo method) {
         var rtType = method.ReturnType;
-        if(rtType == typeof(Task)) {
+        if (rtType == typeof(Task)) {
             return true;
         }
-        
-        if(rtType.IsGenericType() && rtType.GetGenericTypeDefinition() == typeof(Task<>)) {
+
+        if (rtType.IsGenericType() && rtType.GetGenericTypeDefinition() == typeof(Task<>)) {
             return true;
         }
-        
+
         return false;
     }
-    
+
     public static IEnumerable<MemberInfo> GetPropertiesAndFields(this Type type, BindingFlags flags = BindingFlags.Public | BindingFlags.Instance) {
         return type.GetProperties(flags).Cast<MemberInfo>().Concat(type.GetFields(flags));
     }
-    
+
     public static IEnumerable<StandaloneObjectMember> GetPropertyProxies(this Type type, BindingFlags flags = BindingFlags.Public | BindingFlags.Instance) {
         foreach (var member in type.GetPropertiesAndFields(flags)) {
             yield return new StandaloneObjectMember(member);
         }
     }
-    
+
     public static IEnumerable<(MethodInfo, T)> MethodsWithAttribute<T>(this Type type, BindingFlags flags = BindingFlags.Public | BindingFlags.Instance) where T : Attribute {
         return type.GetMethods(flags)
-                   .Select(method => (method, method.GetCustomAttribute<T>()))
-                   .Where(pair => pair.Item2 != null)
-                   .Select(pair => (pair.method, pair.Item2!));
+           .Select(method => (method, method.GetCustomAttribute<T>()))
+           .Where(pair => pair.Item2 != null)
+           .Select(pair => (pair.method, pair.Item2!));
     }
 }

@@ -1,0 +1,18 @@
+FILE
+  VoltumStatementImpl(STATEMENT)
+    VoltumReturnExprImpl(RETURN_EXPR)
+      PsiElement(return)('return')
+      PsiWhiteSpace(' ')
+      VoltumBinaryExprImpl(BINARY_EXPR) = (x > y)
+        VoltumAtomExprImpl(ATOM_EXPR)
+          PathExpr(r: 'x', p: 'x')
+            VoltumVarReferenceImpl(VAR_REFERENCE)
+              PsiElement(ID)('x')
+        PsiWhiteSpace(' ')
+        VoltumBinaryOpImpl(BINARY_OP) = >
+          PsiElement(>)('>')
+        PsiWhiteSpace(' ')
+        VoltumAtomExprImpl(ATOM_EXPR)
+          PathExpr(r: 'y', p: 'y')
+            VoltumVarReferenceImpl(VAR_REFERENCE)
+              PsiElement(ID)('y')

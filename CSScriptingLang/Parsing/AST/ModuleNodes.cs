@@ -10,15 +10,6 @@ public partial class ModuleDeclarationNode : BaseNode
 
     public ModuleDeclarationNode() { }
 
-    public override string ToString(int indent = 0) {
-        var str = $"{new string(' ', indent)}{GetType().Name}: {{\n";
-
-        str += $"{new string(' ', indent + 2)}Name: {Name.NativeValue}\n";
-
-        str += $"\n{new string(' ', indent)}}}";
-
-        return str;
-    }
 }
 
 [ASTNode]
@@ -27,15 +18,6 @@ public partial class ImportStatementsNode : NodeList<ImportStatementNode>
     public ImportStatementsNode() { }
     public ImportStatementsNode(IEnumerable<ImportStatementNode> statements) : base(statements) { }
 
-    public override string ToString(int indent = 0) {
-        var str = $"{new string(' ', indent)}{GetType().Name}: {{\n";
-
-        str += PrintNodes(indent + 2, "\n");
-
-        str += $"\n{new string(' ', indent)}}}";
-
-        return str;
-    }
 }
 
 [ASTNode]
@@ -48,7 +30,4 @@ public partial class ImportStatementNode : BaseNode
         Path = path;
     }
 
-    public override string ToString(int indent = 0) {
-        return $"{new string(' ', indent)}{GetType().Name}: {Path.ToString()}";
-    }
 }

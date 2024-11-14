@@ -12,6 +12,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CSScriptingLang.Common", "C
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CSScriptingLang.LSP", "CSScriptingLang.LSP\CSScriptingLang.LSP.csproj", "{BED9897F-2FB9-400B-853D-8AC9E9EB49A1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CSScriptingLang.BindingsMetaGenerator", "CSScriptingLang.BindingsMetaGenerator\CSScriptingLang.BindingsMetaGenerator.csproj", "{C69CA2AF-8DCD-4465-9594-E8B805BE0F5D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,5 +44,9 @@ Global
 		{BED9897F-2FB9-400B-853D-8AC9E9EB49A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BED9897F-2FB9-400B-853D-8AC9E9EB49A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BED9897F-2FB9-400B-853D-8AC9E9EB49A1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C69CA2AF-8DCD-4465-9594-E8B805BE0F5D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C69CA2AF-8DCD-4465-9594-E8B805BE0F5D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C69CA2AF-8DCD-4465-9594-E8B805BE0F5D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C69CA2AF-8DCD-4465-9594-E8B805BE0F5D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

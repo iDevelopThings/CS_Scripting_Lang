@@ -4,6 +4,7 @@ using CSScriptingLang.RuntimeValues.Types;
 
 namespace CSScriptingLang.RuntimeValues.Values;
 
+/*
 public static class TypeCoercionRegistry
 {
     private static readonly Dictionary<Type, int> TypePrecedence = new() {
@@ -63,40 +64,6 @@ public static class TypeCoercionRegistry
     }
 }
 
-public struct BaseValueTypeIs
-{
-    public BaseValueTypeIs(RTVT type) {
-        Type = type;
-    }
-    private RTVT Type { get; set; }
-
-
-    public bool Null => Type == RTVT.Null;
-    public bool Unit => Type == RTVT.Unit;
-
-    public bool Int32  => (Type & RTVT.Int32) != 0;
-    public bool Int64  => (Type & RTVT.Int64) != 0;
-    public bool Float  => (Type & RTVT.Float) != 0;
-    public bool Double => (Type & RTVT.Double) != 0;
-    public bool Number => (Type & RTVT.Number) != 0;
-
-    public bool String   => Type == RTVT.String;
-    public bool Boolean  => Type == RTVT.Boolean;
-    public bool Object   => Type == RTVT.Object;
-    public bool Function => Type == RTVT.Function;
-    public bool Array    => Type == RTVT.Array;
-    public bool Signal   => Type == RTVT.Signal;
-    
-    public bool A(RTVT type) => (Type & type) != 0;
-    
-    public bool ThrowIfNot(RTVT type, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string member = "") { 
-        if ((Type & type) == 0) {
-            throw new InterpreterRuntimeException($"Expected type {type} but got {Type}.").WithCaller(file, line, member);
-        }
-
-        return true;
-    }
-}
 
 public abstract partial class BaseValue
 {
@@ -391,3 +358,5 @@ public abstract partial class BaseValue
         throw new InvalidOperationException($"Unsupported operation lhs={Type} op=-= rhs={right.Type}");
     }
 }
+*/
+

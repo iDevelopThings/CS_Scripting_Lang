@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using CSScriptingLangGenerators.Utils;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -8,12 +9,37 @@ namespace CSScriptingLangGenerators.Bindings;
 
 public class BindingsSyntaxReceiver : ISyntaxContextReceiver
 {
-    public HashSet<INamedTypeSymbol> Prototypes      { get; } = new(SymbolEqualityComparer.Default);
-    public HashSet<INamedTypeSymbol> Modules         { get; } = new(SymbolEqualityComparer.Default);
-    public HashSet<INamedTypeSymbol> Classes         { get; } = new(SymbolEqualityComparer.Default);
-    public HashSet<Location>         MissingPartials { get; } = new();
+    public enum SymbolType
+    {
+        Prototype,
+        Module,
+        Class,
+    }
+
+    public HashSet<INamedTypeSymbol> Prototypes       { get; } = new(SymbolEqualityComparer.Default);
+    public HashSet<INamedTypeSymbol> Modules          { get; } = new(SymbolEqualityComparer.Default);
+    public HashSet<INamedTypeSymbol> Classes          { get; } = new(SymbolEqualityComparer.Default);
+    public HashSet<INamedTypeSymbol> WrappableClasses { get; } = new(SymbolEqualityComparer.Default);
+
+    public IEnumerable<(INamedTypeSymbol symbol, SymbolType type)> AllTypes =>
+        Prototypes.Select(s => (s, SymbolType.Prototype))
+           .Concat(Modules.Select(s => (s, SymbolType.Module)))
+           .Concat(Classes.Select(s => (s, SymbolType.Class)));
+
+    public HashSet<Location> MissingPartials { get; } = new();
 
     public void OnVisitSyntaxNode(GeneratorSyntaxContext context) {
+        // We need to detect `[module: LanguageClassWrappableObjectBind(typeof(HttpListenerContext))]` defined on the AssemblyInfo.cs
+        if (context.Node is AttributeSyntax attribute) {
+            if (attribute.Name.ToString().Contains(Attributes.ClassWrappableObject)) {
+                if (attribute.ArgumentList?.Arguments.FirstOrDefault()?.Expression is TypeOfExpressionSyntax type) {
+                    if (ModelExtensions.GetTypeInfo(context.SemanticModel, type.Type).Type is INamedTypeSymbol wrappableType) {
+                        WrappableClasses.Add(wrappableType);
+                    }
+                }
+            }
+        }
+
         if (context.Node is not ClassDeclarationSyntax classDecl) {
             return;
         }

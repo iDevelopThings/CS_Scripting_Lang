@@ -1,5 +1,8 @@
 ﻿using CSScriptingLang.Interpreter.Context;
+using CSScriptingLang.Interpreter.Modules;
 using CSScriptingLang.Parsing.AST;
+using CSScriptingLang.RuntimeValues.Prototypes;
+using CSScriptingLang.RuntimeValues.Prototypes.Types;
 using CSScriptingLang.RuntimeValues.Types;
 using CSScriptingLang.RuntimeValues.Values;
 
@@ -12,13 +15,19 @@ public partial class StringExpression : LiteralValueExpression
         get => (string) UntypedValue;
         set => UntypedValue = value;
     }
-    
+
     public Value RTValue => Value.String(NativeValue);
+
+    public override ITypeAlias GetTypeAlias() => TypeAlias<StringPrototype>.Get();
     
     public override ValueReference Execute(ExecContext ctx) {
         return new ValueReference(ctx, RTValue);
     }
 
+    public override IEnumerable<Ty> ResolveTypes(ExecContext ctx, DefinitionSymbol symbol) {
+        yield return TypeAlias<StringPrototype>.Get().Ty;
+    }
+    
     public StringExpression(string value) : base(value) {
         NativeValue = value;
         // Strip the quotes from the string
@@ -26,10 +35,4 @@ public partial class StringExpression : LiteralValueExpression
             NativeValue = NativeValue[1..^1];
         }
     }
-
-    public override string ToString(int indent = 0) {
-        return $"{new string(' ', indent)}{GetType().Name}: {NativeValue}";
-    }
-
-    public override RuntimeType GetRuntimeType() => StaticTypes.String;
 }

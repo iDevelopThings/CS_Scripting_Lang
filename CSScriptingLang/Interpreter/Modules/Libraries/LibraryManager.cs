@@ -15,9 +15,18 @@ public interface ILibrary
     IEnumerable<KeyValuePair<string, Value>> GetDefinitions(ExecContext ctx);
 }
 
+public interface ILibraryImpl
+{
+    IEnumerable<KeyValuePair<string, Value>> OnGetLibraryDefinitions(ExecContext  ctx, ILibrary lib);
+    IEnumerable<ILibrary>                    OnGetAdditionalLibraries(ExecContext ctx, ILibrary lib);
+}
+
 public class LibraryManager : IEnumerable<ILibraryCollection>
 {
     private List<ILibraryCollection> Factories = new();
+
+    public static LibraryFactoryCollection Libraries { get; set; }
+    public static bool                     IsLoaded  { get; set; }
 
     public Action<ExecContext, LibraryCollection> OnConfigure { get; set; }
     public Action<LibraryManager>                 OnPreLoad   { get; set; }
@@ -37,34 +46,61 @@ public class LibraryManager : IEnumerable<ILibraryCollection>
     }
 
     public void Load(ExecContext ctx, Action<LibraryCollection> configAction = null) {
-
-        var definitionNames = new HashSet<string>();
-
+        IsLoaded = false;
+        
         OnPreLoad?.Invoke(this);
 
-        var libs = new LibraryFactoryCollection(Factories);
-        libs.Setup(ctx);
+        Libraries = new LibraryFactoryCollection(Factories);
+        Libraries.Setup(ctx);
 
-        foreach (var (name, value) in libs.Definitions) {
-            if (!definitionNames.Add(name))
-                throw new Exception($"Duplicate definition for '{name}'");
+        LoadDefinitions(ctx);
 
-            ctx.Variables.Set(name, value);
-        }
-
-        var libraryCollection = new LibraryCollection(libs);
+        var libraryCollection = new LibraryCollection(Libraries);
 
         OnConfigure?.Invoke(ctx, libraryCollection);
 
         configAction?.Invoke(libraryCollection);
+        
+        IsLoaded = true;
+    }
+
+    private static void LoadDefinitions(ExecContext ctx) {
+        var definitionNames = new HashSet<string>();
+
+        foreach (var (name, value) in Libraries.Definitions) {
+            if (!definitionNames.Add(name))
+                throw new Exception($"Duplicate definition for '{name}'");
+
+            value._context = ctx;
+
+            ctx.Variables.Set(name, value);
+        }
+    }
+
+    public void Add(ExecContext ctx, ILibraryCollection item) {
+        ArgumentNullException.ThrowIfNull(item);
+
+        if(!IsLoaded) {
+            Factories.Add(item);
+        } else {
+            throw new InvalidOperationException("Cannot add libraries after they have been loaded");
+        }
+    }
+    public void Add(ExecContext ctx, ILibrary item) {
+        ArgumentNullException.ThrowIfNull(item);
+
+        if(!IsLoaded) {
+            Add(item);
+            return;
+        }
+        
+        Libraries.Add(ctx, item);
     }
 
     public void Add(ILibraryCollection item) {
         ArgumentNullException.ThrowIfNull(item);
-
         Factories.Add(item);
     }
-
     public void Add(ILibrary item) {
         ArgumentNullException.ThrowIfNull(item);
 
@@ -93,8 +129,8 @@ public class LibraryEqualityComparer : IEqualityComparer<ILibrary>
 
 public class LibraryFactoryCollection
 {
-    public List<ILibrary>                        Libraries { get; set; }
-    public List<ILibraryCollection>              Factories { get; set; }
+    public List<ILibrary>                    Libraries { get; set; }
+    public List<ILibraryCollection>          Factories { get; set; }
     public List<KeyValuePair<string, Value>> Definitions = new();
 
     public LibraryFactoryCollection(List<ILibraryCollection> factories) {
@@ -103,6 +139,18 @@ public class LibraryFactoryCollection
 
     public LibraryFactoryCollection(List<ILibrary> libraries) {
         Libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
+    }
+
+    public void Add(ExecContext ctx, ILibrary lib) {
+        if (Libraries == null)
+            Libraries = new();
+
+        Libraries.Add(lib);
+
+        Definitions = Libraries
+           .Distinct(new LibraryEqualityComparer())
+           .SelectMany(l => l.GetDefinitions(ctx))
+           .ToList();
     }
 
     public void Setup(ExecContext ctx) {
@@ -135,7 +183,7 @@ public class SingleLibraryCollection : ILibraryCollection
 
 public class LibraryCollection : IEnumerable<ILibrary>
 {
-    private List<ILibrary>                        Libraries   { get; set; }
+    private List<ILibrary>                    Libraries   { get; set; }
     public  List<KeyValuePair<string, Value>> Definitions { get; set; }
 
     internal LibraryCollection(List<ILibrary> libraries) {

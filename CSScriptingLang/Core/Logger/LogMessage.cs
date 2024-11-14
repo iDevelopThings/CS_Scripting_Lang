@@ -1,8 +1,7 @@
-﻿using System.Runtime.CompilerServices;
-using Alba.CsConsoleFormat;
+﻿
 using CSScriptingLang.Utils;
 
-namespace Engine.Engine.Logging;
+namespace CSScriptingLang.Core.Logging;
 
 public struct LogMessage : IEquatable<LogMessage>
 {

@@ -1,5 +1,8 @@
 ﻿using CSScriptingLang.Interpreter.Context;
+using CSScriptingLang.Interpreter.Modules;
 using CSScriptingLang.Parsing.AST;
+using CSScriptingLang.RuntimeValues.Prototypes;
+using CSScriptingLang.RuntimeValues.Prototypes.Types;
 using CSScriptingLang.RuntimeValues.Types;
 using CSScriptingLang.RuntimeValues.Values;
 using CSScriptingLang.Utils;
@@ -18,6 +21,12 @@ public partial class ObjectProperty : BaseNode
         Name  = name;
         Value = value;
     }
+
+    public override IEnumerable<Ty> ResolveTypes(ExecContext ctx, DefinitionSymbol symbol) {
+        foreach (var resolveType in Value.ResolveAndCacheTypes(ctx, symbol)) {
+            yield return resolveType;
+        }
+    }
 }
 
 [ASTNode]
@@ -28,8 +37,6 @@ public partial class ObjectLiteralExpression : LiteralValueExpression
     [VisitableNodeProperty]
     public List<ObjectProperty> Properties { get; } = new();
 
-    public RuntimeTypeInfo_Object ObjectType { get; set; }
-
     public ObjectLiteralExpression(object value = null) : base(value) { }
 
     public ObjectProperty AddProperty(string name, Expression value) {
@@ -38,13 +45,25 @@ public partial class ObjectLiteralExpression : LiteralValueExpression
         return prop;
     }
 
+    public override ITypeAlias GetTypeAlias() => TypeAlias<ObjectPrototype>.Get();
+
+    public override IEnumerable<Ty> ResolveTypes(ExecContext ctx, DefinitionSymbol symbol) {
+        var ty       = Ty.Object();
+        
+        foreach (var prop in Properties) {
+            var val = prop.ResolveAndCacheTypes(ctx, symbol).First();
+            ty.SetMember(prop.Name, val);
+        }
+        
+        yield return ty;
+    }
+
     public override ValueReference Execute(ExecContext ctx) {
         var obj = Value.Object(Properties.Select(p => {
-            var val   = p.Value.Execute(ctx);
+            var val = p.Value.Execute(ctx);
             return (p.Name, val.Value);
-        }));
-        
+        }), ctx);
+
         return ctx.ValReference(obj);
     }
 }
-

@@ -1,10 +1,5 @@
-﻿using CSScriptingLang.Core;
-using CSScriptingLang.Interpreter.Context;
+﻿using CSScriptingLang.Interpreter.Context;
 using CSScriptingLang.Interpreter.Execution.Expressions;
-using CSScriptingLang.Interpreter.Execution.Statements;
-using CSScriptingLang.Parsing.AST;
-using CSScriptingLang.RuntimeValues.Types;
-using CSScriptingLang.Utils;
 using CSScriptingLang.RuntimeValues.Values;
 
 namespace CSScriptingLang.Interpreter;
@@ -12,7 +7,7 @@ namespace CSScriptingLang.Interpreter;
 public partial class Interpreter
 {
     
-    private (Value fn, Value inst) TryGetFunctionValue(CallExpression node, ExecContext ctx) {
+    /*private (Value fn, Value inst) TryGetFunctionValue(CallExpression node, ExecContext ctx) {
         if (node.Variable != null) {
             if (node.Variable is InlineFunctionDeclaration inlineFn) {
                 throw new NotImplementedException("Inline function execution not implemented");
@@ -50,7 +45,7 @@ public partial class Interpreter
 
         throw new Exception("Failed to get function value");
         // return Value.Function(function);
-    }
+    }*/
 
     /*private (InlineFunctionDeclaration, Value) TryGetFunction(CallExpression node, ExecContext ctx) {
         if (node.Variable != null) {
@@ -83,6 +78,7 @@ public partial class Interpreter
         return (function, null);
     }*/
 
+    /*
     private List<(VariableSymbol argSymbol, Value argValue)> ResolveFunctionArgumentValues(CallExpression node, FunctionExecContext fnContext) {
         var declaration = fnContext.Function;
 
@@ -98,7 +94,7 @@ public partial class Interpreter
 
                 /*if (ExecuteGetValueAndSymbol(arg, fnContext, out var argSymbol, out var argValue)) {
                     return (argSymbol, argValue);
-                }*/
+                }#1#
 
                 LogError(arg, $"Failed to get value from argument node");
                 return (null, null);
@@ -190,7 +186,7 @@ public partial class Interpreter
                 symbol.IsReference(argSymbol);
             } else {
                 symbol = fnContext.Scope.Set(name, value);
-            }*/
+            }#1#
 
             symbol = fnContext.Scope.Set(name, value);
             if (symbol != null)
@@ -296,5 +292,5 @@ public partial class Interpreter
         var result = NewResult();
 
         return result;
-    }
+    }*/
 }

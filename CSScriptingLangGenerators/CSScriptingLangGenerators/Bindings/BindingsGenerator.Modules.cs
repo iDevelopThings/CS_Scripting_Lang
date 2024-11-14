@@ -8,143 +8,173 @@ namespace CSScriptingLangGenerators.Bindings;
 
 public partial class BindingsGenerator
 {
-    private void ModuleBindings(GeneratorExecutionContext context, INamedTypeSymbol module, Writer writer) {
-        var moduleName   = module.GetAttributeArgument<string>(Attributes.Module, module.Name);
-        var fnsAsGlobals = module.GetAttributeArgument<bool>(Attributes.Module, true, 1);
+    private void ModuleBindings(
+        GeneratorExecutionContext context,
+        INamedTypeSymbol          module,
+        ModuleTypeData            moduleData
+    ) {
+        // var moduleData = ModuleTypeData.ForModuleBinding(module, context, outerWriter);
+        var w = moduleData;
 
-        var qualifier    = $"global::{module.GetFullyQualifiedName()}";
-        var properties   = GetProperties(context, module).ToList();
-        var methods      = GetMethods(context, module);
-        var methodTables = MethodData.Build(context, methods);
+        var moduleName   = moduleData.Name;
+        var fnsAsGlobals = moduleData.FunctionsAsGlobals;
+        var qualifier    = moduleData.Qualifier;
 
-        using (writer.B("public sealed partial class Library : ILibrary")) {
+        // var qualifier    = $"global::{module.GetFullyQualifiedName()}";
+        // var properties   = GetProperties(context, module).ToList();
+        // var methods      = GetMethods(context, module);
+        // var methodTables = MethodData.Build(context, methods);
+
+        using (w.B("public sealed partial class Library : ILibrary")) {
 
             if (!module.IsStatic) {
                 var canDefaultConstruct = module.HasDefaultConstructor();
 
-                writer._($"private readonly {qualifier} _instance;");
-                writer._();
-                writer._(canDefaultConstruct
-                             ? $"public Library({qualifier} instance = null)"
-                             : $"public Library({qualifier} instance)");
-                writer.OpenBracket();
-                writer._(canDefaultConstruct
-                             ? $"_instance = instance ?? new {qualifier}();"
-                             : $"_instance = instance ?? throw new ArgumentNullException(nameof(instance));");
-                writer.CloseBracket();
-                writer._();
+                w._($"public static {qualifier} GlobalInstance {{get;set;}}");
+                w._($"public {qualifier} Instance {{get;set;}}");
+
+                w._();
+                using (w.B($"public Library({qualifier} inst {(canDefaultConstruct ? "= null" : "")})")) {
+                    if (canDefaultConstruct) {
+                        w._($"Instance = inst ?? new {qualifier}();");
+                    } else {
+                        w._($"Instance = inst ?? throw new ArgumentNullException(nameof(inst));");
+                    }
+
+                    w._($"GlobalInstance = Instance;");
+                }
+                w._();
             }
 
-            using (writer.B("public IEnumerable<KeyValuePair<string, Value>> GetDefinitions(ExecContext ctx)")) {
-                var bindsCtorArgs = module.IsStatic ? "" : "_instance";
-                writer._($"var binds = new Binds({bindsCtorArgs});");
-                writer._();
+            using (w.B("public IEnumerable<KeyValuePair<string, Value>> GetDefinitions(ExecContext ctx)")) {
+                var bindsCtorArgs = module.IsStatic ? "" : "Instance";
+                w._($"var binds = new Binds({bindsCtorArgs});");
+                w._();
+
+                moduleData.WriteDefinitions();
+
 
                 if (fnsAsGlobals) {
-                    foreach (var property in properties) {
+                    /*foreach (var property in properties) {
                         if (property.GetMethod != null) {
-                            writer._($"yield return new KeyValuePair<string, Value>(\"get{property.Name}\", Value.Function(\"{property.Name}\", binds.{property.Name}__Getter));");
+                            w._($"yield return new KeyValuePair<string, Value>(" +
+                                     $"\"get{property.Name}\", " +
+                                     $"Value.Function(\"{property.Name}\", binds.{property.Name}__Getter)" +
+                                     $");");
                         }
 
                         if (property.SetMethod != null) {
-                            writer._($"yield return new KeyValuePair<string, Value>(\"set{property.Name}\", Value.Function(\"{property.Name}\", binds.{property.Name}__Setter));");
+                            w._($"yield return new KeyValuePair<string, Value>(" +
+                                     $"\"set{property.Name}\", " +
+                                     $"Value.Function(\"{property.Name}\", binds.{property.Name}__Setter)" +
+                                     $");");
                         }
                     }
 
                     foreach (var table in methodTables) {
-                        writer._($"yield return new KeyValuePair<string, Value>(\"{table.Identifier}\", Value.Function(\"{table.Identifier}\", binds.{table.Identifier}__Dispatch));");
+                        w._($"yield return new KeyValuePair<string, Value>(\"{table.Identifier}\", Value.Function(\"{table.Identifier}\", binds.{table.Identifier}__Dispatch));");
                     }
 
-                    writer._("yield break;");
+                    w._("yield break;");*/
                 } else {
-                    writer._("var result = Value.Object();");
-                    writer._();
+                    /*
+                    w._("var result = Value.Object();");
+                    w._();
 
                     foreach (var property in properties) {
                         if (property.GetMethod != null) {
-                            writer._($"result[\"get{property.Name}\"] = Value.Function(\"{property.Name}\", binds.{property.Name}__Getter);");
+                            w._($"result[\"get{property.Name}\"] = Value.Function(" +
+                                     $"\"{property.Name}\", binds.{property.Name}__Getter" +
+                                     $");");
                         }
 
                         if (property.SetMethod != null) {
-                            writer._($"result[\"set{property.Name}\"] = Value.Function(\"{property.Name}\", binds.{property.Name}__Setter);");
+                            w._($"result[\"set{property.Name}\"] = Value.Function(\"{property.Name}\", binds.{property.Name}__Setter);");
                         }
                     }
 
                     foreach (var table in methodTables) {
-                        writer._($"result[\"{table.Identifier}\"] = Value.Function(\"{table.Identifier}\", binds.{table.Identifier}__Dispatch);");
+                        w._($"result[\"{table.Identifier}\"] = Value.Function(\"{table.Identifier}\", binds.{table.Identifier}__Dispatch);");
                     }
 
-                    writer._();
+                    w._();
 
                     foreach (var table in methodTables) {
                         if (!table.IsGlobal)
                             continue;
-                        writer._($"yield return new KeyValuePair<string, Value>(\"{table.Identifier}\", Value.Function(\"{table.Identifier}\", binds.{table.Identifier}__Dispatch));");
+                        w._($"yield return new KeyValuePair<string, Value>(\"{table.Identifier}\", Value.Function(\"{table.Identifier}\", binds.{table.Identifier}__Dispatch));");
                     }
 
-                    writer._($"yield return new KeyValuePair<string, Value>(\"{moduleName}\", result);");
+                    w._($"yield return new KeyValuePair<string, Value>(\"{moduleName}\", result);");
+                    */
                 }
             }
 
-            writer._();
+            w._();
 
-            using (writer.B("private sealed class Binds")) {
+            using (w.B("private sealed class Binds")) {
                 if (!module.IsStatic) {
-                    writer._($"private readonly {qualifier} _instance;");
-                    writer._();
-                    using (writer.B($"public Binds({qualifier} instance)")) {
-                        writer._("_instance = instance;");
+                    w._($"private readonly {qualifier} Instance;");
+                    w._();
+                    using (w.B($"public Binds({qualifier} inst)")) {
+                        w._("Instance = inst;");
                     }
 
-                    writer._();
+                    w._();
                 }
 
+                moduleData.WriteBindDefinitions();
+                moduleData.WriteMethodDefinitions(moduleData.FunctionsAsGlobals, false);
+
+                /*
                 foreach (var property in properties) {
                     var propertyQualifier = property.Property.IsStatic ? qualifier : "_instance";
 
                     if (property.GetMethod != null) {
-                        using (writer.B($"public Value {property.Name}__Getter(FunctionExecContext ctx, params Value[] args)")) {
-                            using (writer.If("args.Length != 0")) {
-                                writer._($"throw new InterpreterRuntimeException(\"{moduleName}.get{property.Name}: expected 0 arguments\");");
+                        using (w.B($"public Value {property.Name}__Getter(FunctionExecContext ctx, params Value[] args)")) {
+                            using (w.If("args.Length != 0")) {
+                                w._($"throw new InterpreterRuntimeException(\"{moduleName}.get{property.Name}: expected 0 arguments\");");
                             }
 
-                            writer._($"var value = {propertyQualifier}.{property.Name};");
-                            writer._($"return {ConvertToValue(context, "value", property.Type, property.Property)};");
+                            w._($"var value = {propertyQualifier}.{property.Name};");
+                            w._($"return {ConvertToValue(context, "value", property.Type, property.Property)};");
 
 
                         }
 
-                        writer._();
+                        w._();
                     }
 
                     if (property.SetMethod != null) {
                         var parameter = Parameter.Create(context, property.SetMethod.Parameters[0]);
 
-                        using (writer.B($"public Value {property.Name}__Setter(FunctionExecContext ctx, params Value[] args)")) {
+                        using (w.B($"public Value {property.Name}__Setter(FunctionExecContext ctx, params Value[] args)")) {
 
-                            using (writer.If($"args.Length != 1")) {
-                                writer._($"throw new InterpreterRuntimeException(\"{moduleName}.set{property.Name}: expected 1 argument of type {parameter.TypeName}\");");
+                            using (w.If($"args.Length != 1")) {
+                                w._($"throw new InterpreterRuntimeException(\"{moduleName}.set{property.Name}: expected 1 argument of type {parameter.TypeName}\");");
                             }
 
                             if (parameter.RequiresParamTypeCheck()) {
-                                using (writer.If($"!{CompareArgument(0, parameter)}")) {
-                                    writer._($"throw new InterpreterRuntimeException(\"{moduleName}.set{property.Name}: expected 1 argument of type {parameter.TypeName}\");");
+                                using (w.If($"!{CompareArgument(0, parameter)}")) {
+                                    w._($"throw new InterpreterRuntimeException(\"{moduleName}.set{property.Name}: expected 1 argument of type {parameter.TypeName}\");");
                                 }
                             }
 
-                            writer._($"{propertyQualifier}.{property.Name} = {ConvertFromValue(context, 0, property.Type, property.Property)};");
+                            w._($"{propertyQualifier}.{property.Name} = {ConvertFromValue(context, 0, property.Type, property.Property)};");
 
-                            writer._("return Value.Undefined;");
+                            w._("return Value.Undefined;");
                         }
 
-                        writer._();
+                        w._();
                     }
                 }
+                */
 
+                /*
                 foreach (var table in methodTables) {
-                    using (writer.B($"public Value {table.Identifier}__Dispatch(FunctionExecContext ctx, params Value[] args)")) {
+                    using (w.B($"public Value {table.Identifier}__Dispatch(FunctionExecContext ctx, params Value[] args)")) {
 
-                        using (writer.B("switch (args.Length)")) {
+                        using (w.B("switch (args.Length)")) {
 
                             for (var i = 0; i < table.Methods.Count; i++) {
                                 var tableMethods = table.Methods[i];
@@ -152,7 +182,7 @@ public partial class BindingsGenerator
                                     continue;
                                 }
 
-                                using (writer.B($"case {i}:")) {
+                                using (w.B($"case {i}:")) {
 
                                     // var hasTrueType = false;
 
@@ -161,22 +191,22 @@ public partial class BindingsGenerator
 
                                         for (var paramIdx = 0; paramIdx < method.Parameters.Count; paramIdx++) {
                                             var param = method.Parameters[paramIdx];
-                                            param.WriteTypeCheck(paramIdx, writer);
+                                            param.WriteTypeCheck(paramIdx, w);
                                         }
 
-                                        CallMethod(context, writer, methodQualifier, method, i);
+                                        CallMethod(context, w, methodQualifier, method, i);
 
                                         /*var stmt = CompareArguments(method, out var isTrueType, i);
                                         if (isTrueType)
                                             hasTrueType = true;
 
-                                        using (writer.If(stmt)) {
-                                            CallMethod(context, writer, methodQualifier, method, i);
-                                        }*/
+                                        using (w.If(stmt)) {
+                                            CallMethod(context, w, methodQualifier, method, i);
+                                        }#1#
                                     }
 
                                     // if (!hasTrueType)
-                                    writer._("break;");
+                                    w._("break;");
                                 }
                             }
 
@@ -184,26 +214,27 @@ public partial class BindingsGenerator
 
                         foreach (var method in table.ParamsMethods) {
                             var methodQualifier = method.Info.IsStatic ? qualifier : "_instance";
-                            writer._($"if (args.Length >= {method.RequiredParameterCount} && {CompareArguments(method)})");
-                            writer.OpenBracket();
-                            CallMethod(context, writer, methodQualifier, method);
-                            writer.CloseBracket();
+                            w._($"if (args.Length >= {method.RequiredParameterCount} && {CompareArguments(method)})");
+                            w.OpenBracket();
+                            CallMethod(context, w, methodQualifier, method);
+                            w.CloseBracket();
                         }
 
-                        writer._();
+                        w._();
                         var errorPrefix = fnsAsGlobals
                             ? $"{table.Name}: "
                             : $"{moduleName}.{table.Name}: ";
                         var errorMessage = GetMethodNotMatchedErrorMessage(errorPrefix, table);
-                        writer._($"throw new InterpreterRuntimeException(\"{EscapeForStringLiteral(errorMessage)}\");");
+                        w._($"throw new InterpreterRuntimeException(\"{EscapeForStringLiteral(errorMessage)}\");");
 
                     }
 
-                    writer._();
-                }
+                    w._();
+                }*/
             }
         }
 
 
+        // outerWriter.Write(w);
     }
 }

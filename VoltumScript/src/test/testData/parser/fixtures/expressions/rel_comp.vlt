@@ -1,0 +1,10 @@
+function main() {
+    var value_0 = 1 <= 2 
+    var value_1 = 1 < 2 
+    var value_2 = 1 > 2 
+    var value_3 = 1 >= 2
+    var value_4 = 1 <= 2 
+            && 1 < 2 
+            || 1 > 2 
+            && 1 >= 2
+}

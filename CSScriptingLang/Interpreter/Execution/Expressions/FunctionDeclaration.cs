@@ -1,8 +1,9 @@
 using System.Reflection;
 using CSScriptingLang.Interpreter.Context;
+using CSScriptingLang.Interpreter.Execution.Declaration;
 using CSScriptingLang.Interpreter.Execution.Statements;
-using CSScriptingLang.Lexing;
 using CSScriptingLang.Parsing.AST;
+using CSScriptingLang.Parsing.AST.NamedSymbol;
 using CSScriptingLang.Utils;
 
 namespace CSScriptingLang.Interpreter.Execution.Expressions;
@@ -20,10 +21,10 @@ public partial class InlineFunctionDeclaration : Expression
 
     [VisitableNodeProperty]
     public IdentifierExpression NameIdentifier { get; set; }
-    
+
     public string Name { get; set; }
 
-    public TypeReference ReturnType { get; set; }
+    public TypeIdentifierExpression ReturnType { get; set; } = TypeIdentifierExpression.Unit();
 
     public bool            HasReturnStatementDefined => Body.Any(x => x is ReturnStatement);
     public ReturnStatement ReturnStatement           => Body.Nodes.OfType<ReturnStatement>().FirstOrDefault();
@@ -31,7 +32,9 @@ public partial class InlineFunctionDeclaration : Expression
     public bool IsStatic    { get; set; }
     public bool IsNative    { get; set; }
     public bool IsAsync     { get; set; }
+    public bool IsSeq       { get; set; }
     public bool IsCoroutine { get; set; }
+    public bool IsDef       { get; set; }
 
     private Action<FunctionExecContext> _nativeFunction;
     public Action<FunctionExecContext> NativeFunction {
@@ -43,27 +46,16 @@ public partial class InlineFunctionDeclaration : Expression
     }
 
     private static int _idCounter = 0;
+
     public InlineFunctionDeclaration() {
-        Name       = $"__anon_func_{_idCounter++}";
-        ReturnType = new TypeReference(this, "unit");
+        Name = $"__anon_func_{_idCounter++}";
     }
 
     public InlineFunctionDeclaration(IdentifierExpression name) {
         NameIdentifier = name;
-        Name       = name;
-        ReturnType = new TypeReference(this, "unit");
+        Name           = name;
     }
 
-    public override string ToString(int indent = 0) {
-        var str = $"{new string(' ', indent)}{GetType().Name}: " +
-                  $"({Parameters.ToString(0)}) {{\n" +
-                  $"{Body.ToString(indent + 2)}\n" +
-                  $"{new string(' ', indent)}}}";
-
-        return str;
-    }
-    
-    
     public override ValueReference Execute(ExecContext ctx) {
         var (val, symbol) = ctx.DeclareFunction(this);
 
@@ -72,27 +64,22 @@ public partial class InlineFunctionDeclaration : Expression
 }
 
 [ASTNode]
-public partial class FunctionDeclaration : InlineFunctionDeclaration, ITopLevelDeclarationNode
+public partial class FunctionDeclaration : InlineFunctionDeclaration, ITopLevelDeclarationNode, INamedSymbolProvider
 {
     public DeclarationContext DeclarationContext { get; set; } = new();
+
+    [VisitableNodeProperty]
+    public List<AttributeDeclaration> Attributes { get; set; } = new();
+
     public FunctionDeclaration(IdentifierExpression name) : base(name) { }
-
-    public override string ToString(int indent = 0) {
-        var str = $"{new string(' ', indent)}{GetType().ToShortName()}: {Name}" +
-                  $"({Parameters.ToString(0)}) {{\n" +
-                  $"{Body.ToString(indent + 2)}\n" +
-                  $"{new string(' ', indent)}}}";
-
-        return str;
-    }
 
     public FunctionDeclaration SetNative(bool isNative) {
         IsNative = isNative;
         return this;
     }
 
-    public override ValueReference Execute(ExecContext ctx) {
-        return base.Execute(ctx);
+    public IEnumerable<NamedSymbolInformation> GetNamedSymbols() {
+        yield return new NamedSymbolInformation(this, Name, NamedSymbolKind.Function, NameIdentifier);
     }
 }
 

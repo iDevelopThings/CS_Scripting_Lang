@@ -1,6 +1,5 @@
 ﻿using System.Reflection;
 using System.Text;
-using Terminal.Gui;
 
 namespace CSScriptingLang.Utils;
 

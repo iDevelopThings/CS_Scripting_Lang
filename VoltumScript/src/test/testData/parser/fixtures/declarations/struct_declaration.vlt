@@ -1,0 +1,8 @@
+
+type TestJsonRequest struct {
+    Message string
+    Number int
+    Bool bool
+    FromString int    
+    Data Array<object>
+}

@@ -1,0 +1,11 @@
+
+var arr = [1, 2, 'str', {obj: true}, [1, 2, 3]];
+print('arr = {0}', arr);
+
+function main() {
+    other(1)
+    other_two(1, 2)
+    other_three(1, arr)
+    print('arr = {0}', arr)
+}
+function other(int a) {}

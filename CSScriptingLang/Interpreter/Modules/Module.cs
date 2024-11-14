@@ -1,40 +1,4 @@
-﻿using CSScriptingLang.Parsing.AST;
-using CSScriptingLang.RuntimeValues.Types;
-using CSScriptingLang.RuntimeValues.Values;
-
-namespace CSScriptingLang.Interpreter.Modules;
-
-public class ModuleDeclarations : ModuleScriptDeclarations
-{
-    public virtual Dictionary<string, RuntimeTypeInfo_Struct>      StructsByName                  { get; set; } = new();
-    public virtual Dictionary<string, RuntimeType>                 InterfacesByName               { get; set; } = new();
-    public virtual Dictionary<string, RuntimeTypeInfo_Signal>      SignalsByName                  { get; set; } = new();
-    public virtual Dictionary<string, Value>                       FunctionsByName                { get; set; } = new();
-    public virtual Dictionary<string, DefDeclaration_FunctionNode> DefFunctionsDeclarationsByName { get; set; } = new();
-    public virtual Dictionary<string, VariableSymbol>              VariablesByName                { get; set; } = new();
-
-    public virtual void Add(ModuleScriptDeclarations scriptDeclarations) {
-        TopLevelDeclarations.UnionWith(scriptDeclarations.TopLevelDeclarations);
-
-        StructTypes.UnionWith(scriptDeclarations.StructTypes);
-        StructsByName = StructTypes.ToDictionary(structType => structType.Name);
-
-        InterfaceTypes.UnionWith(scriptDeclarations.InterfaceTypes);
-        InterfacesByName = InterfaceTypes.ToDictionary(interfaceType => interfaceType.Name);
-
-        SignalTypes.UnionWith(scriptDeclarations.SignalTypes);
-        SignalsByName = SignalTypes.ToDictionary(signalType => signalType.Name);
-
-        FunctionTypes.UnionWith(scriptDeclarations.FunctionTypes);
-        FunctionsByName = FunctionTypes.ToDictionary(functionType => functionType.As.Fn().Name);
-
-        DefFunctionDeclarations.UnionWith(scriptDeclarations.DefFunctionDeclarations);
-        DefFunctionsDeclarationsByName = DefFunctionDeclarations.ToDictionary(functionType => functionType.Name);
-
-        VariableDeclarations.UnionWith(scriptDeclarations.VariableDeclarations);
-        VariablesByName = VariableDeclarations.ToDictionary(variable => variable.Name);
-    }
-}
+﻿namespace CSScriptingLang.Interpreter.Modules;
 
 public class Module
 {
@@ -44,8 +8,6 @@ public class Module
     public bool IsMainModule { get; set; }
 
     public List<Script> Scripts { get; set; } = new();
-
-    public ModuleDeclarations Declarations = new();
 
     public Script MainScript { get; set; }
     public Script TryGetMainScript() {

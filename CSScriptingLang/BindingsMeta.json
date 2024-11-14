@@ -1,0 +1,1431 @@
+[
+  {
+    "Classes": [],
+    "Prototypes": [],
+    "Properties": [],
+    "Constructors": [],
+    "Methods": [
+      {
+        "Name": "sleep",
+        "Definition": "\r\ndef function sleep(int32 ms) object;",
+        "Documentation": null,
+        "Parameters": [
+          {
+            "Name": "ms",
+            "Type": "int32",
+            "IsVariadic": false
+          }
+        ],
+        "ReturnType": {
+          "Name": "object",
+          "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+        },
+        "IsAsync": false,
+        "IsGlobal": false
+      }
+    ],
+    "Aliases": [],
+    "Name": "Async",
+    "Namespace": "CSScriptingLang.Core.Async.AsyncContext",
+    "Module": null,
+    "SuperType": null,
+    "Kind": "Module",
+    "RelativePath": "Async",
+    "Definition": "\r\ndef function sleep(int32 ms) object;"
+  },
+  {
+    "Classes": [
+      {
+        "Properties": [
+          {
+            "IsInstanceGetterProperty": true,
+            "IsGetter": true,
+            "IsSetter": true,
+            "Name": "body",
+            "Definition": "body string",
+            "Documentation": null,
+            "Type": {
+              "Name": "string",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.StringPrototype"
+            },
+            "Parameters": [],
+            "ReturnType": null,
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "IsInstanceGetterProperty": true,
+            "IsGetter": true,
+            "IsSetter": true,
+            "Name": "params",
+            "Definition": "params array",
+            "Documentation": null,
+            "Type": {
+              "Name": "array",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ArrayPrototype"
+            },
+            "Parameters": [],
+            "ReturnType": null,
+            "IsAsync": false,
+            "IsGlobal": false
+          }
+        ],
+        "Constructors": [],
+        "Methods": [
+          {
+            "Name": "getBody",
+            "Definition": "\r\ndef getBody(...object args) object;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "args",
+                "Type": "object",
+                "IsVariadic": true
+              }
+            ],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          }
+        ],
+        "Aliases": [],
+        "Name": "HttpRequest",
+        "Namespace": "CSScriptingLang.Core.Http.HttpRequest",
+        "Module": "Http",
+        "SuperType": null,
+        "Kind": "Class",
+        "RelativePath": "Http/HttpRequest",
+        "Definition": "\r\ntype HttpRequest struct\r\n{\r\n  body string\r\n  params array\r\n  \r\n  def getBody(...object args) object;\r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [
+          {
+            "Name": "#ctor",
+            "Definition": "\r\ndef HttpRequestContext() ;",
+            "Documentation": null,
+            "Parameters": [],
+            "ReturnType": null,
+            "IsAsync": false,
+            "IsGlobal": false
+          }
+        ],
+        "Methods": [],
+        "Aliases": [],
+        "Name": "HttpRequestContext",
+        "Namespace": "CSScriptingLang.Core.Http.HttpRequestContext",
+        "Module": "Http",
+        "SuperType": null,
+        "Kind": "Class",
+        "RelativePath": "Http/HttpRequestContext",
+        "Definition": "\r\ntype HttpRequestContext struct\r\n{\r\n  \r\n  def HttpRequestContext() ;\r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [],
+        "Aliases": [],
+        "Name": "HttpResponse",
+        "Namespace": "CSScriptingLang.Core.Http.HttpResponse",
+        "Module": "Http",
+        "SuperType": null,
+        "Kind": "Class",
+        "RelativePath": "Http/HttpResponse",
+        "Definition": "\r\ntype HttpResponse struct\r\n{\r\n  \r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [],
+        "Aliases": [],
+        "Name": "HttpRoute",
+        "Namespace": "CSScriptingLang.Core.Http.HttpRoute",
+        "Module": "Http",
+        "SuperType": null,
+        "Kind": "Class",
+        "RelativePath": "Http/HttpRoute",
+        "Definition": "\r\ntype HttpRoute struct\r\n{\r\n  \r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [
+          {
+            "IsInstanceGetterProperty": false,
+            "IsGetter": true,
+            "IsSetter": false,
+            "Name": "getIsOptional",
+            "Definition": "def getIsOptional() bool",
+            "Documentation": null,
+            "Type": {
+              "Name": "boolean",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.BooleanPrototype"
+            },
+            "Parameters": [],
+            "ReturnType": null,
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "IsInstanceGetterProperty": false,
+            "IsGetter": false,
+            "IsSetter": true,
+            "Name": "setIsOptional",
+            "Definition": "def setIsOptional(bool value) void",
+            "Documentation": null,
+            "Type": {
+              "Name": "boolean",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.BooleanPrototype"
+            },
+            "Parameters": [],
+            "ReturnType": null,
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "IsInstanceGetterProperty": false,
+            "IsGetter": true,
+            "IsSetter": false,
+            "Name": "getName",
+            "Definition": "def getName() string",
+            "Documentation": null,
+            "Type": {
+              "Name": "string",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.StringPrototype"
+            },
+            "Parameters": [],
+            "ReturnType": null,
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "IsInstanceGetterProperty": false,
+            "IsGetter": false,
+            "IsSetter": true,
+            "Name": "setName",
+            "Definition": "def setName(string value) void",
+            "Documentation": null,
+            "Type": {
+              "Name": "string",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.StringPrototype"
+            },
+            "Parameters": [],
+            "ReturnType": null,
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "IsInstanceGetterProperty": false,
+            "IsGetter": true,
+            "IsSetter": false,
+            "Name": "getRawParam",
+            "Definition": "def getRawParam() string",
+            "Documentation": null,
+            "Type": {
+              "Name": "string",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.StringPrototype"
+            },
+            "Parameters": [],
+            "ReturnType": null,
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "IsInstanceGetterProperty": false,
+            "IsGetter": false,
+            "IsSetter": true,
+            "Name": "setRawParam",
+            "Definition": "def setRawParam(string value) void",
+            "Documentation": null,
+            "Type": {
+              "Name": "string",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.StringPrototype"
+            },
+            "Parameters": [],
+            "ReturnType": null,
+            "IsAsync": false,
+            "IsGlobal": false
+          }
+        ],
+        "Constructors": [
+          {
+            "Name": "#ctor",
+            "Definition": "\r\ndef HttpRoutePathParameter() ;",
+            "Documentation": null,
+            "Parameters": [],
+            "ReturnType": null,
+            "IsAsync": false,
+            "IsGlobal": false
+          }
+        ],
+        "Methods": [],
+        "Aliases": [],
+        "Name": "HttpRoutePathParameter",
+        "Namespace": "CSScriptingLang.Core.Http.HttpRoutePathParameter",
+        "Module": "Http",
+        "SuperType": null,
+        "Kind": "Class",
+        "RelativePath": "Http/HttpRoutePathParameter",
+        "Definition": "\r\ntype HttpRoutePathParameter struct\r\n{\r\n  def getIsOptional() bool\r\n  def setIsOptional(bool value) void\r\n  def getName() string\r\n  def setName(string value) void\r\n  def getRawParam() string\r\n  def setRawParam(string value) void\r\n  \r\n  def HttpRoutePathParameter() ;\r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [
+          {
+            "Name": "use",
+            "Definition": "\r\ndef use(object handler) void;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "handler",
+                "Type": "object",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "void",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.UnitPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "use",
+            "Definition": "\r\ndef use(string path, object handler) void;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "path",
+                "Type": "string",
+                "IsVariadic": false
+              },
+              {
+                "Name": "handler",
+                "Type": "object",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "void",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.UnitPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "GET",
+            "Definition": "\r\ndef GET(string path, object handler) object;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "path",
+                "Type": "string",
+                "IsVariadic": false
+              },
+              {
+                "Name": "handler",
+                "Type": "object",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "POST",
+            "Definition": "\r\ndef POST(string path, object handler) object;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "path",
+                "Type": "string",
+                "IsVariadic": false
+              },
+              {
+                "Name": "handler",
+                "Type": "object",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "PUT",
+            "Definition": "\r\ndef PUT(string path, object handler) object;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "path",
+                "Type": "string",
+                "IsVariadic": false
+              },
+              {
+                "Name": "handler",
+                "Type": "object",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "DELETE",
+            "Definition": "\r\ndef DELETE(string path, object handler) object;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "path",
+                "Type": "string",
+                "IsVariadic": false
+              },
+              {
+                "Name": "handler",
+                "Type": "object",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "PATCH",
+            "Definition": "\r\ndef PATCH(string path, object handler) object;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "path",
+                "Type": "string",
+                "IsVariadic": false
+              },
+              {
+                "Name": "handler",
+                "Type": "object",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "HEAD",
+            "Definition": "\r\ndef HEAD(string path, object handler) object;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "path",
+                "Type": "string",
+                "IsVariadic": false
+              },
+              {
+                "Name": "handler",
+                "Type": "object",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "OPTIONS",
+            "Definition": "\r\ndef OPTIONS(string path, object handler) object;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "path",
+                "Type": "string",
+                "IsVariadic": false
+              },
+              {
+                "Name": "handler",
+                "Type": "object",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          }
+        ],
+        "Aliases": [],
+        "Name": "HttpRouter",
+        "Namespace": "CSScriptingLang.Core.Http.HttpRouter",
+        "Module": "Http",
+        "SuperType": null,
+        "Kind": "Class",
+        "RelativePath": "Http/HttpRouter",
+        "Definition": "\r\ntype HttpRouter struct\r\n{\r\n  \r\n  def use(object handler) void;\r\n  def use(string path, object handler) void;\r\n  def GET(string path, object handler) object;\r\n  def POST(string path, object handler) object;\r\n  def PUT(string path, object handler) object;\r\n  def DELETE(string path, object handler) object;\r\n  def PATCH(string path, object handler) object;\r\n  def HEAD(string path, object handler) object;\r\n  def OPTIONS(string path, object handler) object;\r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [
+          {
+            "IsInstanceGetterProperty": true,
+            "IsGetter": true,
+            "IsSetter": true,
+            "Name": "router",
+            "Definition": "router HttpRouter",
+            "Documentation": null,
+            "Type": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "Parameters": [],
+            "ReturnType": null,
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "IsInstanceGetterProperty": true,
+            "IsGetter": true,
+            "IsSetter": true,
+            "Name": "isListening",
+            "Definition": "isListening bool",
+            "Documentation": {
+              "Summary": "Check if we're listening for requests",
+              "CodeExample": null
+            },
+            "Type": {
+              "Name": "boolean",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.BooleanPrototype"
+            },
+            "Parameters": [],
+            "ReturnType": null,
+            "IsAsync": false,
+            "IsGlobal": false
+          }
+        ],
+        "Constructors": [
+          {
+            "Name": "#ctor",
+            "Definition": "def HttpServer(string host);\r\n",
+            "Documentation": null,
+            "Parameters": [],
+            "ReturnType": null,
+            "IsAsync": false,
+            "IsGlobal": false
+          }
+        ],
+        "Methods": [
+          {
+            "Name": "listen",
+            "Definition": "def async listen();\r\n",
+            "Documentation": null,
+            "Parameters": [],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": true,
+            "IsGlobal": false
+          },
+          {
+            "Name": "stop",
+            "Definition": "\r\ndef stop() void;",
+            "Documentation": null,
+            "Parameters": [],
+            "ReturnType": {
+              "Name": "void",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.UnitPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          }
+        ],
+        "Aliases": [],
+        "Name": "HttpServer",
+        "Namespace": "CSScriptingLang.Core.Http.HttpServer",
+        "Module": "Http",
+        "SuperType": null,
+        "Kind": "Class",
+        "RelativePath": "Http/HttpServer",
+        "Definition": "\r\ntype HttpServer struct\r\n{\r\n  router HttpRouter\r\n  // Check if we're listening for requests\r\n  isListening bool\r\n  def HttpServer(string host);\r\n  def async listen();\r\n  \r\n  def stop() void;\r\n}\r\n\r\n"
+      }
+    ],
+    "Prototypes": [],
+    "Properties": [],
+    "Constructors": [],
+    "Methods": [],
+    "Aliases": [],
+    "Name": "Http",
+    "Namespace": "CSScriptingLang.Core.Http.Lib_Http",
+    "Module": null,
+    "SuperType": null,
+    "Kind": "Module",
+    "RelativePath": "Http",
+    "Definition": ""
+  },
+  {
+    "Classes": [],
+    "Prototypes": [],
+    "Properties": [],
+    "Constructors": [],
+    "Methods": [
+      {
+        "Name": "deserialize",
+        "Definition": "\r\ndef function deserialize(string text) object;",
+        "Documentation": null,
+        "Parameters": [
+          {
+            "Name": "text",
+            "Type": "string",
+            "IsVariadic": false
+          }
+        ],
+        "ReturnType": {
+          "Name": "object",
+          "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+        },
+        "IsAsync": false,
+        "IsGlobal": false
+      },
+      {
+        "Name": "deserializeTo",
+        "Definition": "\r\ndef function deserializeTo(string text, object value) object;",
+        "Documentation": null,
+        "Parameters": [
+          {
+            "Name": "text",
+            "Type": "string",
+            "IsVariadic": false
+          },
+          {
+            "Name": "value",
+            "Type": "object",
+            "IsVariadic": false
+          }
+        ],
+        "ReturnType": {
+          "Name": "object",
+          "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+        },
+        "IsAsync": false,
+        "IsGlobal": false
+      },
+      {
+        "Name": "deserializeToStruct",
+        "Definition": "\r\ndef function deserializeToStruct(string text, object value) object;",
+        "Documentation": null,
+        "Parameters": [
+          {
+            "Name": "text",
+            "Type": "string",
+            "IsVariadic": false
+          },
+          {
+            "Name": "value",
+            "Type": "object",
+            "IsVariadic": false
+          }
+        ],
+        "ReturnType": {
+          "Name": "object",
+          "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+        },
+        "IsAsync": false,
+        "IsGlobal": false
+      },
+      {
+        "Name": "serialize",
+        "Definition": "\r\ndef function serialize(object value) string;",
+        "Documentation": null,
+        "Parameters": [
+          {
+            "Name": "value",
+            "Type": "object",
+            "IsVariadic": false
+          }
+        ],
+        "ReturnType": {
+          "Name": "string",
+          "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.StringPrototype"
+        },
+        "IsAsync": false,
+        "IsGlobal": false
+      }
+    ],
+    "Aliases": [],
+    "Name": "Json",
+    "Namespace": "CSScriptingLang.Core.Serialization.JsonSerialization.Lib_Json",
+    "Module": null,
+    "SuperType": null,
+    "Kind": "Module",
+    "RelativePath": "Json",
+    "Definition": "\r\ndef function deserialize(string text) object;\r\ndef function deserializeTo(string text, object value) object;\r\ndef function deserializeToStruct(string text, object value) object;\r\ndef function serialize(object value) string;"
+  },
+  {
+    "Classes": [],
+    "Prototypes": [],
+    "Properties": [],
+    "Constructors": [],
+    "Methods": [
+      {
+        "Name": "inspect",
+        "Definition": "\r\ndef function inspect(object value, string context) void;\r\n",
+        "Documentation": null,
+        "Parameters": [
+          {
+            "Name": "inspectValue",
+            "Type": "object",
+            "IsVariadic": false
+          },
+          {
+            "Name": "contextString",
+            "Type": "string",
+            "IsVariadic": false
+          }
+        ],
+        "ReturnType": {
+          "Name": "void",
+          "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.UnitPrototype"
+        },
+        "IsAsync": false,
+        "IsGlobal": true
+      },
+      {
+        "Name": "inspect",
+        "Definition": "\r\ndef function inspect(object value, string context) void;\r\n",
+        "Documentation": null,
+        "Parameters": [
+          {
+            "Name": "inspectValue",
+            "Type": "object",
+            "IsVariadic": false
+          },
+          {
+            "Name": "contextString",
+            "Type": "string",
+            "IsVariadic": false
+          }
+        ],
+        "ReturnType": {
+          "Name": "void",
+          "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.UnitPrototype"
+        },
+        "IsAsync": false,
+        "IsGlobal": true
+      }
+    ],
+    "Aliases": [],
+    "Name": "Lib_Inspect",
+    "Namespace": "CSScriptingLang.Interpreter.Libraries.Lib_Inspect",
+    "Module": null,
+    "SuperType": null,
+    "Kind": "Module",
+    "RelativePath": "Lib_Inspect",
+    "Definition": "\r\ndef function inspect(object value, string context) void;\r\n\r\ndef function inspect(object value, string context) void;\r\n"
+  },
+  {
+    "Classes": [],
+    "Prototypes": [],
+    "Properties": [],
+    "Constructors": [],
+    "Methods": [
+      {
+        "Name": "print",
+        "Definition": "\r\ndef function print(...object args) void;",
+        "Documentation": null,
+        "Parameters": [
+          {
+            "Name": "args",
+            "Type": "object",
+            "IsVariadic": true
+          }
+        ],
+        "ReturnType": {
+          "Name": "void",
+          "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.UnitPrototype"
+        },
+        "IsAsync": false,
+        "IsGlobal": true
+      }
+    ],
+    "Aliases": [],
+    "Name": "Lib_Logging",
+    "Namespace": "CSScriptingLang.Interpreter.Libraries.Lib_Logging",
+    "Module": null,
+    "SuperType": null,
+    "Kind": "Module",
+    "RelativePath": "Lib_Logging",
+    "Definition": "\r\ndef function print(...object args) void;"
+  },
+  {
+    "Classes": [],
+    "Prototypes": [],
+    "Properties": [],
+    "Constructors": [],
+    "Methods": [
+      {
+        "Name": "require",
+        "Definition": "\r\ndef function require(string path) object;",
+        "Documentation": null,
+        "Parameters": [
+          {
+            "Name": "path",
+            "Type": "string",
+            "IsVariadic": false
+          }
+        ],
+        "ReturnType": {
+          "Name": "object",
+          "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+        },
+        "IsAsync": false,
+        "IsGlobal": true
+      }
+    ],
+    "Aliases": [],
+    "Name": "Lib_Require",
+    "Namespace": "CSScriptingLang.Interpreter.Libraries.Lib_Require",
+    "Module": null,
+    "SuperType": null,
+    "Kind": "Module",
+    "RelativePath": "Lib_Require",
+    "Definition": "\r\ndef function require(string path) object;"
+  },
+  {
+    "Classes": [],
+    "Prototypes": [],
+    "Properties": [],
+    "Constructors": [],
+    "Methods": [
+      {
+        "Name": "new",
+        "Definition": "\r\ndef function new<T>(...object args) T;\r\n",
+        "Documentation": null,
+        "Parameters": [
+          {
+            "Name": "args",
+            "Type": "object",
+            "IsVariadic": true
+          }
+        ],
+        "ReturnType": {
+          "Name": "object",
+          "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+        },
+        "IsAsync": false,
+        "IsGlobal": true
+      }
+    ],
+    "Aliases": [],
+    "Name": "Lib_InstanceCreator",
+    "Namespace": "CSScriptingLang.Interpreter.Libraries.Lib_InstanceCreator",
+    "Module": null,
+    "SuperType": null,
+    "Kind": "Module",
+    "RelativePath": "Lib_InstanceCreator",
+    "Definition": "\r\ndef function new<T>(...object args) T;\r\n"
+  },
+  {
+    "Classes": [],
+    "Prototypes": [
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [
+          {
+            "Name": "push",
+            "Definition": "\r\ndef push(...object args) int32;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "args",
+                "Type": "object",
+                "IsVariadic": true
+              }
+            ],
+            "ReturnType": {
+              "Name": "int32",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.Int32Prototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "removeAt",
+            "Definition": "\r\ndef removeAt(object index) int32;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "index",
+                "Type": "object",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "int32",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.Int32Prototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "removeRange",
+            "Definition": "\r\ndef removeRange(object start, object end) int32;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "start",
+                "Type": "object",
+                "IsVariadic": false
+              },
+              {
+                "Name": "end",
+                "Type": "object",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "int32",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.Int32Prototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "getEnumerator",
+            "Definition": "\r\ndef getEnumerator() object;",
+            "Documentation": null,
+            "Parameters": [],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          }
+        ],
+        "Aliases": [
+          "array"
+        ],
+        "Name": "Array",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.ArrayPrototype",
+        "Module": "Prototypes",
+        "SuperType": "Value",
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/Array",
+        "Definition": "\r\ntype Array struct\r\n{\r\n  \r\n  def push(...object args) int32;\r\n  def removeAt(object index) int32;\r\n  def removeRange(object start, object end) int32;\r\n  def getEnumerator() object;\r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [],
+        "Aliases": [
+          "boolean",
+          "bool"
+        ],
+        "Name": "Boolean",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.BooleanPrototype",
+        "Module": "Prototypes",
+        "SuperType": "Value",
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/Boolean",
+        "Definition": "\r\ntype Boolean struct\r\n{\r\n  \r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [],
+        "Aliases": [
+          "enum"
+        ],
+        "Name": "Enum",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.EnumPrototype",
+        "Module": "Prototypes",
+        "SuperType": "Object",
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/Enum",
+        "Definition": "\r\ntype Enum struct\r\n{\r\n  \r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [],
+        "Aliases": [
+          "fn",
+          "function"
+        ],
+        "Name": "Function",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.FunctionPrototype",
+        "Module": "Prototypes",
+        "SuperType": "Value",
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/Function",
+        "Definition": "\r\ntype Function struct\r\n{\r\n  \r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [],
+        "Aliases": [
+          "number"
+        ],
+        "Name": "Number",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.NumberPrototype",
+        "Module": "Prototypes",
+        "SuperType": "Number",
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/Number",
+        "Definition": "\r\ntype Number struct\r\n{\r\n  \r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [],
+        "Aliases": [
+          "int",
+          "int32",
+          "i32"
+        ],
+        "Name": "Int32",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.Int32Prototype",
+        "Module": "Prototypes",
+        "SuperType": "Number",
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/Int32",
+        "Definition": "\r\ntype Int32 struct\r\n{\r\n  \r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [],
+        "Aliases": [
+          "long",
+          "int64",
+          "i64"
+        ],
+        "Name": "Int64",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.Int64Prototype",
+        "Module": "Prototypes",
+        "SuperType": "Number",
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/Int64",
+        "Definition": "\r\ntype Int64 struct\r\n{\r\n  \r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [],
+        "Aliases": [
+          "double",
+          "f64"
+        ],
+        "Name": "Double",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.DoublePrototype",
+        "Module": "Prototypes",
+        "SuperType": "Number",
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/Double",
+        "Definition": "\r\ntype Double struct\r\n{\r\n  \r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [],
+        "Aliases": [
+          "float",
+          "f32"
+        ],
+        "Name": "Float",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.FloatPrototype",
+        "Module": "Prototypes",
+        "SuperType": "Number",
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/Float",
+        "Definition": "\r\ntype Float struct\r\n{\r\n  \r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [
+          {
+            "Name": "toJson",
+            "Definition": "\r\ndef toJson() object;",
+            "Documentation": null,
+            "Parameters": [],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "fromJson",
+            "Definition": "\r\ndef fromJson(string json) object;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "json",
+                "Type": "string",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "setPrototype",
+            "Definition": "\r\ndef setPrototype(object prototype) object;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "prototype",
+                "Type": "object",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "get",
+            "Definition": "\r\ndef get(string key) object;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "key",
+                "Type": "string",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "set",
+            "Definition": "\r\ndef set(string key, object value) void;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "key",
+                "Type": "string",
+                "IsVariadic": false
+              },
+              {
+                "Name": "value",
+                "Type": "object",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "void",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.UnitPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "clear",
+            "Definition": "\r\ndef clear() void;",
+            "Documentation": null,
+            "Parameters": [],
+            "ReturnType": {
+              "Name": "void",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.UnitPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "containsKey",
+            "Definition": "\r\ndef containsKey(string key) boolean;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "key",
+                "Type": "string",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "boolean",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.BooleanPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "containsValue",
+            "Definition": "\r\ndef containsValue(object value) boolean;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "value",
+                "Type": "object",
+                "IsVariadic": false
+              }
+            ],
+            "ReturnType": {
+              "Name": "boolean",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.BooleanPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "getKeys",
+            "Definition": "\r\ndef getKeys() object;",
+            "Documentation": null,
+            "Parameters": [],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "getValues",
+            "Definition": "\r\ndef getValues() object;",
+            "Documentation": null,
+            "Parameters": [],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          },
+          {
+            "Name": "getEnumerator",
+            "Definition": "\r\ndef getEnumerator() object;",
+            "Documentation": null,
+            "Parameters": [],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          }
+        ],
+        "Aliases": [
+          "obj"
+        ],
+        "Name": "Object",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype",
+        "Module": "Prototypes",
+        "SuperType": "Value",
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/Object",
+        "Definition": "\r\ntype Object struct\r\n{\r\n  \r\n  def toJson() object;\r\n  def fromJson(string json) object;\r\n  def setPrototype(object prototype) object;\r\n  def get(string key) object;\r\n  def set(string key, object value) void;\r\n  def clear() void;\r\n  def containsKey(string key) boolean;\r\n  def containsValue(object value) boolean;\r\n  def getKeys() object;\r\n  def getValues() object;\r\n  def getEnumerator() object;\r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [
+          {
+            "Name": "getType",
+            "Definition": "\r\ndef function getType(...object args) object;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "args",
+                "Type": "object",
+                "IsVariadic": true
+              }
+            ],
+            "ReturnType": {
+              "Name": "object",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.ObjectPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": true
+          }
+        ],
+        "Aliases": [
+          "ReflectedType"
+        ],
+        "Name": "ReflectedType",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.ReflectedTypePrototype",
+        "Module": "Prototypes",
+        "SuperType": "Object",
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/ReflectedType",
+        "Definition": "\r\ntype ReflectedType struct\r\n{\r\n  \r\n}\r\n\r\n\r\ndef function getType(...object args) object;"
+      },
+      {
+        "Properties": [],
+        "Constructors": [
+          {
+            "Name": "#ctor",
+            "Definition": "\r\ndef Signal() ;",
+            "Documentation": null,
+            "Parameters": [],
+            "ReturnType": null,
+            "IsAsync": false,
+            "IsGlobal": false
+          }
+        ],
+        "Methods": [
+          {
+            "Name": "emit",
+            "Definition": "\r\ndef emit(...object args) void;",
+            "Documentation": null,
+            "Parameters": [
+              {
+                "Name": "args",
+                "Type": "object",
+                "IsVariadic": true
+              }
+            ],
+            "ReturnType": {
+              "Name": "void",
+              "PrototypeType": "CSScriptingLang.RuntimeValues.Prototypes.UnitPrototype"
+            },
+            "IsAsync": false,
+            "IsGlobal": false
+          }
+        ],
+        "Aliases": [
+          "signal"
+        ],
+        "Name": "Signal",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.SignalPrototype",
+        "Module": "Prototypes",
+        "SuperType": "Value",
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/Signal",
+        "Definition": "\r\ntype Signal struct\r\n{\r\n  \r\n  def Signal() ;\r\n  def emit(...object args) void;\r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [],
+        "Aliases": [
+          "string",
+          "str"
+        ],
+        "Name": "String",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.StringPrototype",
+        "Module": "Prototypes",
+        "SuperType": "Value",
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/String",
+        "Definition": "\r\ntype String struct\r\n{\r\n  \r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [
+          {
+            "Name": "#ctor",
+            "Definition": "\r\ndef Struct() ;",
+            "Documentation": null,
+            "Parameters": [],
+            "ReturnType": null,
+            "IsAsync": false,
+            "IsGlobal": false
+          }
+        ],
+        "Methods": [],
+        "Aliases": [
+          "struct"
+        ],
+        "Name": "Struct",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.StructPrototype",
+        "Module": "Prototypes",
+        "SuperType": "Object",
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/Struct",
+        "Definition": "\r\ntype Struct struct\r\n{\r\n  \r\n  def Struct() ;\r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [],
+        "Aliases": [
+          "void",
+          "unit"
+        ],
+        "Name": "Unit",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.UnitPrototype",
+        "Module": "Prototypes",
+        "SuperType": "Value",
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/Unit",
+        "Definition": "\r\ntype Unit struct\r\n{\r\n  \r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [],
+        "Aliases": [
+          "null"
+        ],
+        "Name": "Null",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.NullPrototype",
+        "Module": "Prototypes",
+        "SuperType": "Value",
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/Null",
+        "Definition": "\r\ntype Null struct\r\n{\r\n  \r\n}\r\n\r\n"
+      },
+      {
+        "Properties": [],
+        "Constructors": [],
+        "Methods": [],
+        "Aliases": [],
+        "Name": "Value",
+        "Namespace": "CSScriptingLang.RuntimeValues.Prototypes.ValuePrototype",
+        "Module": "Prototypes",
+        "SuperType": null,
+        "Kind": "Prototype",
+        "RelativePath": "Prototypes/Value",
+        "Definition": "\r\ntype Value struct\r\n{\r\n  \r\n}\r\n\r\n"
+      }
+    ],
+    "Properties": [],
+    "Constructors": [],
+    "Methods": [],
+    "Aliases": [],
+    "Name": "Prototypes",
+    "Namespace": null,
+    "Module": null,
+    "SuperType": null,
+    "Kind": "Module",
+    "RelativePath": "Prototypes",
+    "Definition": ""
+  }
+]

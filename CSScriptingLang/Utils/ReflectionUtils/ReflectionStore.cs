@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
-using Engine.Engine.Logging;
+using CSScriptingLang.Parsing;
+using CSScriptingLang.Core.Logging;
 using JetBrains.Annotations;
 
 namespace CSScriptingLang.Utils.ReflectionUtils;
@@ -30,7 +31,7 @@ public static class ReflectionStore
 
     public static readonly HashSet<string> ProjectAssemblyNames = new() {
         "CSScriptingLang",
-        "LanguageTests",
+        "CSScriptingLang.Tests",
     };
 
 
@@ -93,18 +94,28 @@ public static class ReflectionStore
                 if (type.IsAssignableFrom(t))
                     ReflectedTypes[type].Add(t);
                 // Also support generic types, for example adding children of SomeType<T> to SomeType<>
+                var parentType = type.BaseType;
+                if (type.IsGenericTypeDefinition && t != type) {
+                    if(t.IsAssignableFrom(type)) {
+                        ReflectedTypes[type].Add(t);
+                    }
+                    if (t!.BaseType?.IsGenericTypeDefinition == true) {
+                        if (t!.BaseType!.GetGenericTypeDefinition() == type.GetGenericTypeDefinition())
+                            ReflectedTypes[type].Add(t);
+                    }
+                }
                 if (type.IsGenericType && t!.IsGenericType && type.GetGenericTypeDefinition() == t.GetGenericTypeDefinition())
                     ReflectedTypes[type].Add(t);
             }
         }
     }
 
-    private static void EnsureLoaded<T>() {
-        var assembly = typeof(T).Assembly;
+    private static void EnsureLoaded(Type type) {
+        var assembly = type.Assembly;
         if (ProcessedAssemblies.Contains(assembly))
             return;
 
-        using var _ = Timer.NewWith($"Ensure Loaded {typeof(T).Name}, {assembly.GetName().Name}");
+        using var _ = Timer.NewWith($"Ensure Loaded {type.Name}, {assembly.GetName().Name}");
 
         try {
             AddTypes(assembly, assembly.GetTypes());
@@ -113,6 +124,7 @@ public static class ReflectionStore
             AddTypes(assembly, e.Types);
         }
     }
+    private static void EnsureLoaded<T>() => EnsureLoaded(typeof(T));
 
     public static IEnumerable<MethodInfo> AllMethodsWithAttribute<T>(BindingFlags flags = BindingFlags.Public) where T : Attribute {
         EnsureLoaded<T>();
@@ -144,7 +156,7 @@ public static class ReflectionStore
 
         foreach (var t in TypesWithAttributeKv.GetOrAdd(typeof(T)))
             yield return (t.Item2, (T) t.Item1);
-        
+
     }
 
     public static List<Type> AllTypesWithAttribute<TA, TB>() {
@@ -156,9 +168,11 @@ public static class ReflectionStore
            .ToList();
     }
 
-    public static List<Type> AllTypesOf<T>() {
-        EnsureLoaded<T>();
+    public static List<Type> AllTypesOf(Type type) {
+        EnsureLoaded(type);
 
-        return ReflectedTypes.GetValueOrDefault(typeof(T), new List<Type>());
+        return ReflectedTypes.GetValueOrDefault(type, new List<Type>());
     }
+
+    public static List<Type> AllTypesOf<T>() => AllTypesOf(typeof(T));
 }

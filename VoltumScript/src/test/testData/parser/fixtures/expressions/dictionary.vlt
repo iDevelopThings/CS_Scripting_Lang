@@ -1,0 +1,9 @@
+var placeholder = {
+  a : 1,
+  b : true,
+  c : "string",
+  // d : 1.0,
+  e : null,
+  f : { foo : 'bar' },
+  g : [1, 2, 3],   
+}

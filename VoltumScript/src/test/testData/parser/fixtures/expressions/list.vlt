@@ -1,0 +1,2 @@
+var list = [1, true, false, null, "string", { foo : 'bar' }, [1, 2, 3],]
+var list = [1, true, false, null, "string", { foo : 'bar' }, [1, 2, 3]]

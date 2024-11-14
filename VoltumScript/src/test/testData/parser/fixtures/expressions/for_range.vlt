@@ -1,0 +1,5 @@
+var i = range 4
+
+for(var i = range 4) {
+    // print('i = {0}', i);
+}

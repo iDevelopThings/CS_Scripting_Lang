@@ -3,9 +3,9 @@
     "Run(Debug)": {
       "commandName": "Project",
       "workingDirectory": "$(SolutionDir)\\",
-      "commandLineArgs": "testing.js"
+      "commandLineArgs": "using_structs.vlt"
     },
-    "Execute Testing.js": {
+    "Execute Index.vlt": {
       "commandName": "Project",
       "workingDirectory": "$(SolutionDir)\\",
       "commandLineArgs": "run -p CSScriptingLang/TestingScripts -m testing"

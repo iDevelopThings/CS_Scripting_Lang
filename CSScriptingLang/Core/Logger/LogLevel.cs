@@ -1,7 +1,7 @@
 
 using CSScriptingLang.Utils;
 
-namespace Engine.Engine.Logging;
+namespace CSScriptingLang.Core.Logging;
 
 
 public enum LogLevel

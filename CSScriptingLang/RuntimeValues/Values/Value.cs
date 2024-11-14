@@ -5,73 +5,137 @@ using CSScriptingLang.Interpreter.Context;
 using CSScriptingLang.Lexing;
 using CSScriptingLang.RuntimeValues.Prototypes;
 using CSScriptingLang.RuntimeValues.Types;
-using Engine.Engine.Logging;
+using CSScriptingLang.Core.Logging;
 using Force.DeepCloner;
+using ValueType = CSScriptingLang.RuntimeValues.Types.ValueType;
 
 namespace CSScriptingLang.RuntimeValues.Values;
 
+public class ValueDebugView
+{
+    private readonly Value _value;
+
+    public ValueDebugView(Value value) {
+        _value = value;
+    }
+
+    public (RTVT type, RTVT fullType) Type => new(_value.Type, _value.FullType);
+
+    public Prototype PrototypeObjectInstance => _value.PrototypeType;
+    public Symbol    Symbol                  => _value.Symbol;
+
+    public Value Parent => _value.Prototype;
+
+    public object DataObject => _value.DataObject;
+
+    public object Value => _value.GetUntypedValue();
+
+    [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
+    [DebuggerDisplay("Count = {Members.Count}")]
+    public KeyValuePair<string, Value>[] Members => _value.Members.ToArray();
+
+    public ExecContext Context => _value._context;
+}
+
 [DebuggerDisplay($"{{{nameof(ToDebugString)}(),nq}}")]
+[DebuggerTypeProxy(typeof(ValueDebugView))]
 public partial class Value : IEquatable<Value>, IComparable<Value>, IIterable
 {
     protected static Logger Logger = Logs.Get<Value>();
 
-    private bool Locked { get; set; } = false;
+    private bool Locked { get; set; }
 
     /** The actual prototype object of the value when created */
     private Value _prototype;
+    private Prototype _prototypeType;
 
     public Prototype PrototypeType {
-        get => TypesTable.For(Type);
+        // get => _prototypeType ?? TypesTable.For(Type);
+        get => Type.Prototype(_prototypeType);
+        set {
+            if (Locked) {
+                throw new InvalidOperationException("Value is locked");
+            }
+
+            _prototypeType = value;
+        }
     }
 
     public Value Prototype {
         get {
-            switch (Type) {
+            return Type.PrototypeProto(Type switch {
+                RTVT.ValueReference => _value != null ? ((Value) value).Prototype : null,
+                _                   => _prototype,
+            });
+            /*switch (Type) {
                 case RTVT.Array:
                     return ArrayPrototype.Instance.Proto;
                 case RTVT.Object:
                     return _prototype ?? ObjectPrototype.Instance.Proto;
                 case RTVT.Struct:
                     return _prototype ?? StructPrototype.Instance.Proto;
+                case RTVT.Enum:
+                    return _prototype ?? EnumPrototype.Instance.Proto;
+                case RTVT.EnumMember:
+                    return _prototype ?? ObjectPrototype.Instance.Proto;
                 case RTVT.Function:
                     return FunctionPrototype.Instance.Proto;
+                case RTVT.Signal:
+                    return SignalPrototype.Instance.Proto;
                 case RTVT.String:
                     return StringPrototype.Instance.Proto;
                 case RTVT.Boolean:
                     return BooleanPrototype.Instance.Proto;
                 case RTVT.Int32:
+                    return Int32Prototype.Instance.Proto;
                 case RTVT.Int64:
+                    return Int64Prototype.Instance.Proto;
                 case RTVT.Float:
+                    return FloatPrototype.Instance.Proto;
                 case RTVT.Double:
-                    return NumberPrototype.Instance.Proto;
+                    return DoublePrototype.Instance.Proto;
                 case RTVT.ValueReference:
                     return _value != null ? ((Value) value).Prototype : null;
                 case RTVT.Null:
                     return NullPrototype.Instance.Proto;
                 case RTVT.Unit:
                     return UnitPrototype.Instance.Proto;
+
                 default:
                     throw new InvalidOperationException($"Cannot get prototype for value of type {Type}");
 
-            }
-            /*if (_prototype == null)
-                return TypesTable.For(Type)?.Proto;
-
-            return _prototype;*/
+            }*/
         }
         set {
             if (Locked) {
                 throw new InvalidOperationException("Value is locked");
             }
 
-            if (Type == RTVT.Object) {
-                _prototype = value;
-                return;
-            }
+            switch (Type) {
+                case RTVT.Enum:
+                case RTVT.EnumMember:
+                case RTVT.Object:
+                case RTVT.Struct: {
+                    _prototype = value;
+                    return;
+                }
 
-            throw new InvalidOperationException($"Cannot set prototype for value of type {Type}");
+                case RTVT.Signal: {
+                    if (value == null)
+                        throw new InvalidOperationException("Cannot set prototype to null for signal");
+                    if (value.Type != RTVT.Signal)
+                        throw new InvalidOperationException($"Signal prototypes can only be set to other signal prototypes, got {value.Type}");
+                    _prototype = value;
+                    return;
+                }
+
+                default:
+                    throw new InterpreterRuntimeException($"Cannot set prototype for value of type {Type}");
+            }
         }
     }
+
+    public object DataObject { get; set; }
 
     public RTVT Type { get; set; } = RTVT.Null;
 
@@ -100,13 +164,26 @@ public partial class Value : IEquatable<Value>, IComparable<Value>, IIterable
         }
     }
 
-    public Symbol Symbol => PrototypeType?.Symbol;
+    public Symbol _symbol;
+    public Symbol Symbol {
+        get => _symbol ?? PrototypeType?.Symbol;
+        set {
+            if (Locked) {
+                throw new InvalidOperationException("Value is locked");
+            }
+            _symbol = value;
+        }
+    }
 
-    private object _value = null;
+    private object _value;
     private object value {
         get {
             return Type switch {
-                RTVT.Object         => Members,
+                RTVT.Object     => Members,
+                RTVT.Struct     => Members,
+                RTVT.Enum       => Members,
+                RTVT.EnumMember => Members,
+
                 RTVT.ValueReference => ((ValueReference) _value).Value,
 
                 _ => _value,
@@ -117,7 +194,7 @@ public partial class Value : IEquatable<Value>, IComparable<Value>, IIterable
                 throw new InvalidOperationException("Value is locked");
             }
 
-            if (Type == RTVT.Object) {
+            if (Type == RTVT.Object || Type == RTVT.Struct) {
                 Members = (Dictionary<string, Value>) value;
                 return;
             }
@@ -129,8 +206,8 @@ public partial class Value : IEquatable<Value>, IComparable<Value>, IIterable
                         return;
                     }
                     case Value v: {
-                        if (_value != null && _value is ValueReference vr) {
-                            vr.SetValue(v);
+                        if (_value is ValueReference vr) {
+                            vr.SetValue(v, true);
                             return;
                         }
                         throw new InvalidOperationException($"Cannot set value of type {value.GetType()}");
@@ -147,6 +224,10 @@ public partial class Value : IEquatable<Value>, IComparable<Value>, IIterable
             _value = value;
         }
     }
+    private object FullValue => Type switch {
+        RTVT.ValueReference => As.ValueReference().Value.FullValue,
+        _                   => value,
+    };
 
     public Value SetValue(object v) {
         SetValue(v, true);
@@ -164,71 +245,47 @@ public partial class Value : IEquatable<Value>, IComparable<Value>, IIterable
         }
 
         var newValue = v is Value val ? val.value : v;
-        switch (newValue) {
-            case int i:
-                Type = RTVT.Int32;
-                break;
-            case long l:
-                Type = RTVT.Int64;
-                break;
-            case float f:
-                Type = RTVT.Float;
-                break;
-            case double d:
-                Type = RTVT.Double;
-                break;
-            case string s:
-                Type = RTVT.String;
-                break;
-            case bool b:
-                Type = RTVT.Boolean;
-                break;
-            case null:
-                Type = RTVT.Null;
-                break;
-            case FnClosure fn:
-                Type = RTVT.Function;
-                break;
-            case IEnumerable<Value> vv:
-                Type = RTVT.Array;
-                break;
-            case Dictionary<string, Value> obj:
-                Type = RTVT.Object;
-                break;
-            case Value vv:
-                Type = vv.Type;
-                break;
-            default: {
-                if (throwOnFail) {
-                    throw new InvalidOperationException($"Cannot set value of type {v.GetType()}");
-                }
 
-                return false;
-            }
-        }
+        if (!RTVTUtil.FromValueType(newValue, out var type, throwOnFail))
+            return false;
 
-
+        Type  = type;
         value = newValue;
 
         return true;
     }
 
-    public     object GetUntypedValue()    => value;
+    public object GetUntypedValue() {
+        if (Type == RTVT.ValueReference)
+            return As.ValueReference().Value.GetUntypedValue();
+        return value;
+    }
+    public     T      GetUntypedValue<T>() => (T) GetUntypedValue();
     public ref object GetUntypedValueRef() => ref _value;
 
     public Value Lock(bool locked = true) {
         Locked = locked;
         return this;
     }
+    public Value Unlock() => Lock(false);
+    public Value UnlockedOp(Action<Value> op) {
+        var wasLocked = Locked;
+        Locked = false;
+        op(this);
+        Locked = wasLocked;
+        return this;
+    }
+
+    public Value Clone() => this.DeepClone();
 
     public Value GetOrClone() {
         if (PrototypeType?.IsPrimitive ?? false)
-            return this.DeepClone();
+            return Clone();
 
         return this;
     }
 
-    public bool Equals(Value other) => Operator_Equal(other);
+    public bool Equals(Value other) => Operator_Equal(other, true);
 
     bool IEquatable<Value>.Equals(Value other) => Equals(other);
 
@@ -240,6 +297,8 @@ public partial class Value : IEquatable<Value>, IComparable<Value>, IIterable
         return obj is Value other && Equals(other);
     }
     public override int GetHashCode() {
+        if (Type == RTVT.ValueReference)
+            return As.ValueReference().Value.GetHashCode();
         if (Is.Number) return value.GetHashCode();
         if (Is.String) return As.String().GetHashCode();
         if (Is.Boolean) return As.Bool().GetHashCode();
@@ -247,6 +306,7 @@ public partial class Value : IEquatable<Value>, IComparable<Value>, IIterable
         if (Is.Null) return int.MinValue;
         if (Is.Unit) return int.MaxValue;
         if (Is.Function) return As.Fn().GetHashCode();
+
 
         if (Is.Object) {
             if (DispatchCall("__hash", [], out var hashValue)) {
@@ -291,22 +351,71 @@ public partial class Value : IEquatable<Value>, IComparable<Value>, IIterable
 
         if (!TypesTable.TypesByFQN.TryGetValue(prototypeName, out var prototype)) {
             throw new InterpreterRuntimeException($"Could not find prototype for bound object: {prototypeName}");
-
         }
 
-        var inst = Value.Object(ctx);
-        inst.Prototype = prototype;
+        var inst = Value.Object(ctx, prototype.PrototypeInstance.Proto);
 
         return inst;
     }
 
-    public Symbol SetSymbol(string name) {
-        var symbol = Symbol.For(name);
-        SetMember("symbolName", String(name));
-        return symbol;
+    public static Value ClassInstance<T>(ExecContext ctx, T instance, string prototypeName) where T : class {
+        if (ctx == null)
+            throw new ArgumentNullException(nameof(ctx));
+
+        if (!TypesTable.TypesByFQN.TryGetValue(prototypeName, out var prototype)) {
+            throw new InterpreterRuntimeException($"Could not find prototype for bound object: {prototypeName}");
+        }
+
+        var inst = Value.Object(ctx, prototype.PrototypeInstance.Proto);
+        inst.DataObject = instance;
+
+        return inst;
+    }
+    public static Value ClassInstance<T>(ExecContext ctx, T instance, Prototype prototype) where T : class {
+        if (ctx == null)
+            throw new ArgumentNullException(nameof(ctx));
+
+        var inst = Value.Object(ctx, prototype.ValueType.PrototypeInstance.Proto);
+        inst.DataObject = instance;
+
+        return inst;
     }
 
-    public IIterator GetIterator() {
+    public static WrappedValue Wrapped(ExecContext ctx, object instance, string prototypeName = null) {
+        if (ctx == null)
+            throw new ArgumentNullException(nameof(ctx));
+
+        ValueType proto = null;
+        if (prototypeName != null) {
+            TypesTable.TypesByFQN.TryGetValue(prototypeName, out proto);
+        }
+
+        return WrappedValue.From(ctx, instance, proto);
+    }
+    public static WrappedValue<T> Wrapped<T>(ExecContext ctx, T instance, string prototypeName = null) where T : class {
+        if (ctx == null)
+            throw new ArgumentNullException(nameof(ctx));
+
+        ValueType proto = null;
+        if (prototypeName != null) {
+            TypesTable.TypesByFQN.TryGetValue(prototypeName, out proto);
+        }
+
+        return WrappedValue<T>.From(ctx, instance, proto);
+    }
+
+    public Symbol SetSymbol(Symbol symbol) {
+        SetMember("symbolName", symbol.Name);
+        Symbol = symbol;
+        return symbol;
+    }
+    public Symbol SetSymbol(string name) => SetSymbol(Symbol.For(name));
+
+    public IIterator GetIterator(ExecContext ctx) {
+        if (IsEnumerable && Is.Object)
+            return new ObjectEnumerableIterator(this, ctx);
+        if (IsEnumerable)
+            return new EnumerableIterator(this, ctx);
         if (Is.Array)
             return new ArrayIterator(this);
         if (Is.Int32)
@@ -325,20 +434,25 @@ public partial class Value : IEquatable<Value>, IComparable<Value>, IIterable
         throw new InvalidOperationException($"Cannot get iterator for value of type {Type}");
     }
 
-    public string ToDebugString() {
-        return $"{Type}: " + Type switch {
-            RTVT.Null     => "null",
-            RTVT.Unit     => "unit",
-            RTVT.Int32    => As.Int().ToString(),
-            RTVT.Int64    => As.Int64().ToString(),
-            RTVT.Float    => As.Float().ToString(CultureInfo.InvariantCulture),
-            RTVT.Double   => As.Double().ToString(CultureInfo.InvariantCulture),
-            RTVT.String   => As.String(),
-            RTVT.Boolean  => As.Bool().ToString(),
-            RTVT.Function => As.Fn().ToString(),
-            RTVT.Array    => $"[{string.Join(", ", As.List().Select(v => v.ToDebugString()))}]",
-            RTVT.Object   => $"{{ {string.Join(", ", Members.Select(kv => $"{kv.Key}: {kv.Value.ToDebugString()}"))} }}",
-            _             => throw new InvalidOperationException($"Cannot convert value of type {Type} to string")
+    public virtual string ToDebugString() {
+        return $"{Type}(Symbol: {(Symbol?.Name ?? "Undefined")}): " + Type switch {
+            RTVT.Null           => "null",
+            RTVT.Unit           => "unit",
+            RTVT.Int32          => As.Int().ToString(),
+            RTVT.Int64          => As.Int64().ToString(),
+            RTVT.Float          => As.Float().ToString(CultureInfo.InvariantCulture),
+            RTVT.Double         => As.Double().ToString(CultureInfo.InvariantCulture),
+            RTVT.String         => As.String(),
+            RTVT.Boolean        => As.Bool().ToString(),
+            RTVT.Function       => As.Fn().ToString(),
+            RTVT.Array          => $"[{string.Join(", ", As.List().Select(v => v.ToDebugString()))}]",
+            RTVT.Object         => $"{{ {string.Join(", ", Members.Select(kv => $"{kv.Key}: {kv.Value.ToDebugString()}"))} }}",
+            RTVT.Struct         => $"{{ {string.Join(", ", Members.Select(kv => $"{kv.Key}: {kv.Value.ToDebugString()}"))} }}",
+            RTVT.Signal         => $"Signal({(As.Signal()?.Name ?? "Undefined")})({As.Signal()?.Listeners?.Count ?? 0} listeners)",
+            RTVT.ValueReference => $"Reference Value -> {(As.ValueReference().Value?.ToDebugString() ?? "null")}",
+            RTVT.Enum           => $"",
+            RTVT.EnumMember     => $"Value -> {Members["value"]?.ToDebugString()}",
+            _                   => throw new InvalidOperationException($"Cannot convert value of type {Type} to string")
         };
     }
 }

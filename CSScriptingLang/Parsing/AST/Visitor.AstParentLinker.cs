@@ -122,6 +122,25 @@ public class ASTParentLinker : BaseAstVisitor
 
         VisitProgramExpression(node);
     }
+    
+    public void ProcessModuleNodes(ProgramExpression node) {
+        Phase = LinkPhase.PrevNextParentChild;
+        _visitedNodes.Clear();
+        linkedNodes.Clear();
+        BlockStack.Clear();
+        TopLevelDeclarations.Clear();
+        InstructionList.Clear();
+
+        if (node.Nodes.FirstOrDefault(n => n is InlineFunctionDeclaration) is not InlineFunctionDeclaration moduleDecl) {
+            throw new Exception("Module declaration not found");
+        }
+        
+        moduleDecl.Accept(this);
+        
+        // foreach (var stmt in moduleDecl.Statements) {
+        //     stmt.Accept(this);
+        // }
+    }
 
     public override void VisitProgramExpression(ProgramExpression node) {
 

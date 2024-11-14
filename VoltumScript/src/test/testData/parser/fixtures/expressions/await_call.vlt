@@ -1,0 +1,9 @@
+
+await print('async print');
+
+function main() {
+    await other(1)
+    await other()
+}
+
+function other(int a) {}

@@ -1,6 +1,11 @@
-﻿using CSScriptingLang.Interpreter.Context;
+﻿using CSScriptingLang.Core.Diagnostics;
+using CSScriptingLang.Interpreter.Context;
+using CSScriptingLang.Interpreter.Modules;
 using CSScriptingLang.Lexing;
 using CSScriptingLang.Parsing.AST;
+using CSScriptingLang.Parsing.AST.NamedSymbol;
+using CSScriptingLang.RuntimeValues.Prototypes.Types;
+using CSScriptingLang.RuntimeValues.Types;
 
 namespace CSScriptingLang.Interpreter.Execution.Expressions;
 
@@ -85,6 +90,41 @@ public partial class MemberAccessExpression : AccessorExpression, IExecutableNod
         }
 
         return base.Execute(ctx);
+    }
+
+    public override IEnumerable<Ty> ResolveTypes(ExecContext ctx, DefinitionSymbol symbol) {
+        if (Object == null) {
+            throw new FailedToGetRuntimeTypeException(this, $"Object is null; identifier = {Identifier.Name}");
+        }
+
+        Identifier.ResolvedTypes = [];
+        
+        var objType = Object.ResolveAndCacheTypes(ctx, symbol).FirstOrDefault();
+        if (objType != null) {
+            var objMemberType = objType.GetMember(Identifier.Name);
+            if (objMemberType != null) {
+                Identifier.ResolvedTypes.Add(objMemberType);
+                yield return objMemberType;
+                
+                yield break;
+            }
+            
+            DiagnosticManager.Diagnostic_Warning().Message($"Failed to resolve member type {Identifier.Name} on object of type {objType.Name}").Range(this).Report();
+            yield break;
+        }
+
+        DiagnosticManager.Diagnostic_Warning().Message($"Failed to resolve type for {Identifier.Name}").Range(this).Report();
+    }
+
+    public override IEnumerable<NamedSymbolInformation> FindReferences(DefinitionScope scope = null) {
+        var s = scope ?? Scope;
+
+        var lhs = Object.FindReferences(s);
+        var member = lhs.SelectMany(x => x.Type.Members)
+           .Where(x => x.Key == Identifier.Name)
+           .SelectMany(x => x.Value.NamedSymbols);
+
+        return member;
     }
 
     public string GetPath() {

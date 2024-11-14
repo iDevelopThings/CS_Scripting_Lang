@@ -1,9 +1,12 @@
 ﻿using System.Collections;
 using System.Runtime.CompilerServices;
+using CSScriptingLang.Core.Diagnostics;
 using CSScriptingLang.Interpreter.Context;
+using CSScriptingLang.Interpreter.Execution.Statements;
 using CSScriptingLang.Lexing;
 using CSScriptingLang.Parsing.AST;
 using CSScriptingLang.Utils;
+using SharpX;
 
 namespace CSScriptingLang.Interpreter.Execution.Expressions;
 
@@ -17,9 +20,13 @@ public abstract partial class Expression : BaseNode, IExpression
     public virtual bool IsConstant => false;
 
     public virtual ValueReference Execute(ExecContext ctx) {
-        throw new FatalInterpreterException($"Expression.Execute not implemented for {GetType().ToFullLinkedName()}", this);
+        DiagnosticManager.Diagnostic_Error_Fatal().Message($"Expression.Execute not implemented for {GetType().ToFullLinkedName()}").Range(this).Report();
+        return new ValueReference(ctx);
     }
 
+    public virtual IEnumerable<Maybe<ValueReference>> ExecuteEnumerable(ExecContext ctx) {
+        yield return Execute(ctx).ToMaybe();
+    }
     public virtual IEnumerable<ValueReference> ExecuteMulti(ExecContext ctx) {
         yield return Execute(ctx);
     }
@@ -111,6 +118,10 @@ public partial class ExpressionListNode : NodeList<Expression>
 {
     public List<Expression> Expressions     => Nodes;
     public List<BaseNode>   ExpressionNodes => Nodes.OfType<BaseNode>().ToList();
+    
+    public ExpressionListNode() { }
+    public ExpressionListNode(IEnumerable<Expression> expressions) : base(expressions) { }
+    public ExpressionListNode(Expression expr) : base([expr]) { }
     
     public IEnumerable<ValueReference> Execute(ExecContext ctx) {
         return Expressions.Select(e => e.Execute(ctx));

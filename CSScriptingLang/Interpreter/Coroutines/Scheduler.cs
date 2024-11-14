@@ -1,4 +1,4 @@
-﻿using Engine.Engine.Logging;
+﻿using CSScriptingLang.Core.Logging;
 
 namespace CSScriptingLang.Interpreter.Coroutines;
 

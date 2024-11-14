@@ -7,6 +7,40 @@ using SharpX;
 namespace CSScriptingLang.Interpreter.Execution.Statements;
 
 [ASTNode]
+public partial class ForWhileLoopStatement : Statement
+{
+    [VisitableNodeProperty]
+    public BlockExpression Body { get; }
+
+
+    public ForWhileLoopStatement(BlockExpression body) {
+        Body = body;
+    }
+
+    public override Maybe<ValueReference> Execute(ExecContext ctx) {
+        using var _ = ctx.UsingScope();
+        try {
+
+            while (true) {
+                try {
+                    Body.Execute(ctx, false);
+                }
+                catch (ExecContext.ContinueException) { }
+            }
+        }
+        catch (ExecContext.BreakException e) {
+            if (e.Count > 1) {
+                e.Count--;
+                throw;
+            }
+        }
+
+        return Maybe.Nothing<ValueReference>();
+    }
+
+}
+
+[ASTNode]
 public partial class ForLoopStatement : Statement
 {
     // let i = 0
@@ -34,28 +68,40 @@ public partial class ForLoopStatement : Statement
 
     public override Maybe<ValueReference> Execute(ExecContext ctx) {
         using var _ = ctx.UsingScope();
+        try {
 
-        if (Initialization != null) {
-            switch (Initialization) {
-                case Expression init:
-                    init.Execute(ctx);
+            if (Initialization != null) {
+                switch (Initialization) {
+                    case Expression init:
+                        init.Execute(ctx);
+                        break;
+                    case VariableDeclarationNode varDecl:
+                        varDecl.Execute(ctx);
+                        break;
+                    default:
+                        ctx.LogError(Initialization, $"Invalid initialization expression: {Initialization?.GetType().ToFullLinkedName()}");
+                        break;
+                }
+            }
+
+            while (true) {
+                var cond = Condition.Execute(ctx);
+                if (!cond.Value.IsTruthy())
                     break;
-                case VariableDeclarationNode varDecl:
-                    varDecl.Execute(ctx);
-                    break;
-                default:
-                    ctx.LogError(Initialization, $"Invalid initialization expression: {Initialization?.GetType().ToFullLinkedName()}");
-                    break;
+
+                try {
+                    Body.Execute(ctx, false);
+                }
+                catch (ExecContext.ContinueException) { }
+
+                Increment?.Execute(ctx);
             }
         }
-
-        while (true) {
-            var cond = Condition.Execute(ctx);
-            if (!cond.Value.IsTruthy())
-                break;
-            Body.Execute(ctx, false);
-
-            Increment?.Execute(ctx);
+        catch (ExecContext.BreakException e) {
+            if (e.Count > 1) {
+                e.Count--;
+                throw;
+            }
         }
 
         return Maybe.Nothing<ValueReference>();
@@ -72,7 +118,7 @@ public partial class ForRangeStatement : Statement
     public VariableDeclarationNode Initializer { get; set; }
 
     [VisitableNodeProperty]
-    public RangeExpression Range { get; set; }
+    public RangeExpression RangeExpr { get; set; }
 
     [VisitableNodeProperty]
     public BlockExpression Body { get; set; }
@@ -82,16 +128,16 @@ public partial class ForRangeStatement : Statement
         Body     = new();
     }
     public ForRangeStatement(TupleListDeclarationNode indexers, RangeExpression range, BlockExpression body) {
-        Indexers = indexers;
-        Range    = range;
-        Body     = body;
+        Indexers  = indexers;
+        RangeExpr = range;
+        Body      = body;
     }
 
     public override Maybe<ValueReference> Execute(ExecContext ctx) {
 
         using var _ = ctx.UsingScope();
 
-        var rangeResult = Range.ExecuteMulti(ctx).ToArray();
+        var rangeResult = RangeExpr.ExecuteMulti(ctx).ToArray();
 
         var rangeMin   = rangeResult[0].Value;
         var rangeValue = rangeResult[1].Value;
@@ -121,7 +167,7 @@ public partial class ForRangeStatement : Statement
             loopElementDecl = elementDecl;
         }
 
-        var iterator = rangeValue.GetIterator();
+        var iterator = rangeValue.GetIterator(ctx);
 
         var            loopIndexVar   = ctx.Variables.Declare(variableInitializerNode.Name);
         VariableSymbol loopElementVar = null;
@@ -139,7 +185,7 @@ public partial class ForRangeStatement : Statement
 
             Body.Execute(ctx);
         }
-        
+
         return Maybe.Nothing<ValueReference>();
     }
 }

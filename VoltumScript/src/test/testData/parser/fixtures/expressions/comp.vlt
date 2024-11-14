@@ -1,0 +1,6 @@
+function main() {
+    // comp exprs: != ==
+    var placeholder = 1;
+    var value_1 = placeholder != 2;
+    var value_2 = placeholder == 2;
+}

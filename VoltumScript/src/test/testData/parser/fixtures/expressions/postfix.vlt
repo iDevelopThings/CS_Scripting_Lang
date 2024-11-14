@@ -1,0 +1,5 @@
+function main() {
+    var placeholder = 1;
+    var value_1 = placeholder-- 
+    var value_2 = placeholder++
+}

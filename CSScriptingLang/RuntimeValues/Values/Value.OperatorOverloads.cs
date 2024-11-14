@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using System.Runtime.CompilerServices;
 using CSScriptingLang.Interpreter.Context;
+using CSScriptingLang.Interpreter.Execution.Statements;
 using SharpX;
 
 namespace CSScriptingLang.RuntimeValues.Values;
@@ -33,6 +34,9 @@ public partial class Value
     public static implicit operator Value(List<Value> v) => Array(v);
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static implicit operator Value(Unit v) => Unit();
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static implicit operator Signal(Value v) => v.value as Signal;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static implicit operator bool(Value v) => v.IsTruthy();
@@ -56,50 +60,28 @@ public partial class Value
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static implicit operator int(Value v) {
-        return v.Is switch {
-            {Number: true} => v.As.Int(),
-
-            _ => throw new InvalidCastException($"Cannot convert {v.Type} to int"),
-        };
-    }
+    public static implicit operator int(Value v) => v.Is.Number ? v.GetUntypedValue<int>() : throw new InvalidCastException($"Cannot convert {v.Type} to int");
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static implicit operator long(Value v) {
-        return v.Is switch {
-            {Number: true} => v.As.Long(),
-
-            _ => throw new InvalidCastException($"Cannot convert {v.Type} to long"),
-        };
-    }
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static implicit operator double(Value v) {
-        return v.Is switch {
-            {Number: true} => v.As.Double(),
-
-            _ => throw new InvalidCastException($"Cannot convert {v.Type} to double"),
-        };
-    }
+    public static implicit operator long(Value v) => v.Is.Number ? v.GetUntypedValue<long>() : throw new InvalidCastException($"Cannot convert {v.Type} to long");
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static implicit operator float(Value v) {
-        return v.Is switch {
-            {Number: true} => v.As.Float(),
+    public static implicit operator double(Value v) => v.Is.Number ? v.GetUntypedValue<double>() : throw new InvalidCastException($"Cannot convert {v.Type} to double");
 
-            _ => throw new InvalidCastException($"Cannot convert {v.Type} to float"),
-        };
-    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static implicit operator float(Value v) => v.Is.Number ? v.GetUntypedValue<float>() : throw new InvalidCastException($"Cannot convert {v.Type} to float");
 
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static implicit operator string(Value v) {
         return v.Is switch {
-            {String : true} => v.As.String(),
-            {Int32  : true} => v.As.Int().ToString(),
-            {Int64  : true} => v.As.Long().ToString(),
-            {Float  : true} => v.As.Float().ToString(CultureInfo.InvariantCulture),
-            {Double : true} => v.As.Double().ToString(CultureInfo.InvariantCulture),
-            {Boolean: true} => v.As.Bool().ToString(),
+            {String : true}              => v.GetUntypedValue<string>(),
+            {Int32  : true}              => v.GetUntypedValue<int>().ToString(),
+            {Int64  : true}              => v.GetUntypedValue<long>().ToString(),
+            {Float  : true}              => v.GetUntypedValue<float>().ToString(CultureInfo.InvariantCulture),
+            {Double : true}              => v.GetUntypedValue<double>().ToString(CultureInfo.InvariantCulture),
+            {Boolean: true}              => v.GetUntypedValue<bool>().ToString(),
+            {Null: true} or {Unit: true} => null,
 
             _ => throw new InvalidCastException($"Cannot convert {v.Type} to string"),
         };

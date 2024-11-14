@@ -135,5 +135,35 @@ public static class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
+    
+    public static readonly DiagnosticDescriptor OperatorOverloadMethodsShouldBeStatic = new(
+        "CSSL15",
+        "Operator overload methods should be static",
+        "Operator overload methods should be static",
+        Category,
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor OperatorOverloadMethodFirstParameterShouldBeInstance = new(
+        "CSSL16",
+        "Operator overload method first parameter should be instance",
+        "Operator overload method first parameter should be instance, ie: public static Value operator_plus(Value instance, Value other)",
+        Category,
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    
+    public static readonly DiagnosticDescriptor OperatorNotSupported = new(
+        "CSSL17",
+        "Operator not supported",
+        "Operator `{0}` is not supported, valid operators are: {1}",
+        Category,
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    
     //  public static readonly DiagnosticDescriptor 
 }

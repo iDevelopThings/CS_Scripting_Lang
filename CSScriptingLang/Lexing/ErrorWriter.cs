@@ -4,6 +4,8 @@ using CSScriptingLang.Interpreter.Modules;
 using CSScriptingLang.Parsing.AST;
 using CSScriptingLang.RuntimeValues.Types;
 using CSScriptingLang.Utils;
+using JetBrains.Annotations;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 
 namespace CSScriptingLang.Lexing;
 
@@ -101,13 +103,13 @@ public class ErrorWriter
             return LogError(message, new TokenRange(), new TokenRange());
         }
 
-        var (from, to) = node.Cursor.FindTokenRange();
+        var (from, to) = node.FindTokenRange();
 
         return LogError(message, from.Range, to.Range);
     }
 
     public void LogWarning(string message, BaseNode node) {
-        var (from, to) = node.Cursor.FindTokenRange();
+        var (from, to) = node.FindTokenRange();
         var sb = LogError(message, from.Range, to.Range);
         Console.WriteLine(sb.ToString());
     }
@@ -121,17 +123,17 @@ public class ErrorWriter
         var endColumn = end.Column;
 
         var output = new StringBuilder();
-
+        
         output.AppendLine(new string('-', 80));
         output.AppendLine($"Error: {message}");
         if (ScriptPath != null) {
-            output.AppendLine($"{ScriptPath}:{startLine}:{startColumn}");
+            output.AppendLine($"{DocumentUri.FromFileSystemPath(ScriptPath)}:{startLine}:{startColumn}");
         } else {
             output.AppendLine($"Location: {startLine}:{startColumn}");
         }
 
         if (Caller.IsValid()) {
-            output.AppendLine($"{Caller.File}:{Caller.Line} -> {Caller.MethodFullName}");
+            output.AppendLine($"{DocumentUri.FromFileSystemPath(Caller.File)}:{Caller.Line} -> {Caller.MethodFullName}");
         }
 
         output.AppendLine();
@@ -222,7 +224,9 @@ public class ErrorWriter
     }
 
     private void PrintSourceWithHighlight(StringBuilder output, int startLine, int startColumn, int endLine, int endColumn, string message) {
-        var lines = ScriptSource.Split('\n');
+        var lines = ScriptSource
+           .Replace("\r\n", "\n")
+           .Split('\n');
 
         var startingLine = Math.Max(0, startLine - 6);
         var endingLine   = Math.Min(lines.Length, endLine + 6);
@@ -372,6 +376,9 @@ public class BaseLanguageException : Exception
     public BaseLanguageException(string message) : base(message) {
         Caller = Caller.FromException(this);
     }
+    public BaseLanguageException(string message, Exception inner) : base(message, inner) {
+        Caller = Caller.FromException(inner);
+    }
     public BaseLanguageException(string message, Caller caller) : base(message) {
         Caller = caller;
     }
@@ -380,7 +387,8 @@ public class BaseLanguageException : Exception
 public class BaseLanguageException<T> : BaseLanguageException where T : BaseLanguageException<T>
 {
     public BaseLanguageException(string message) : base(message) { }
-    public BaseLanguageException(string message, Caller caller) : base(message, caller) { }
+    public BaseLanguageException(string message, Exception inner) : base(message, inner) { }
+    public BaseLanguageException(string message, Caller    caller) : base(message, caller) { }
 
     public T WithCaller([CallerFilePath] string file = "", [CallerLineNumber] int line = 0, [CallerMemberName] string member = "") {
         Caller = Caller.FromAttributes(file, line, member);
@@ -398,18 +406,15 @@ public class BaseLanguageException<T> : BaseLanguageException where T : BaseLang
 
 }
 
-public class DeclarationException : BaseLanguageException<DeclarationException>
+/*public class DeclarationException : BaseLanguageException<DeclarationException>
 {
     public BaseNode Node { get; set; }
-    public DeclarationException(string message, RuntimeType type) : base(message) {
-        Node   = type.LinkedNode;
-        Script = type.DeclarationContext?.DeclaringScript;
-    }
+
     public DeclarationException(string message, BaseNode node, Script script) : base(message) {
         Node   = node;
         Script = script;
     }
-}
+}*/
 
 public class InterpreterException : BaseLanguageException<InterpreterException>
 {
@@ -425,14 +430,14 @@ public class InterpreterException : BaseLanguageException<InterpreterException>
     }
 }
 
-public class FatalInterpreterException : InterpreterException
+/*public class FatalInterpreterException : InterpreterException
 {
     public FatalInterpreterException(string message, BaseNode node) : base(message, node) {
         Trace = CallerList.Get(1, 8);
     }
 
     public FatalInterpreterException(string message, BaseNode node, Script script) : base(message, node, script) { }
-}
+}*/
 
 public class SyntaxException : BaseLanguageException<SyntaxException>
 {
@@ -448,7 +453,7 @@ public class SyntaxException : BaseLanguageException<SyntaxException>
     }
 }
 
-public class ParserException : BaseLanguageException<ParserException>
+/*public class ParserException : BaseLanguageException<ParserException>
 {
     public TokenRange From { get; set; }
     public TokenRange To   { get; set; }
@@ -458,9 +463,9 @@ public class ParserException : BaseLanguageException<ParserException>
         To     = to;
         Script = script;
     }
-}
+}*/
 
-public class LexerException : BaseLanguageException<LexerException>
+/*public class LexerException : BaseLanguageException<LexerException>
 {
     public TokenRange From { get; set; }
     public TokenRange To   { get; set; }
@@ -469,11 +474,15 @@ public class LexerException : BaseLanguageException<LexerException>
         From = from;
         To   = to;
     }
-}
+}*/
 
 public class InterpreterRuntimeException : BaseLanguageException<InterpreterRuntimeException>
 {
     public InterpreterRuntimeException(string message) : base(message) { }
+    public InterpreterRuntimeException(string message, Exception inner) : base(message, inner) { }
+
+    [StringFormatMethod("format")]
+    public InterpreterRuntimeException(string format, params object[] args) : base(string.Format(format, args)) { }
 }
 
 public class FailedToGetRuntimeTypeException : InterpreterException

@@ -12,7 +12,7 @@ namespace CSScriptingLang.Interpreter;
 public partial class Interpreter
 {
 
-    private ExecResult Execute(MemberAccessExpression node, ExecContext ctx) {
+    /*private ExecResult Execute(MemberAccessExpression node, ExecContext ctx) {
         var result = NewResult();
 
         var objResult = Execute(node.Object, ctx);
@@ -67,8 +67,8 @@ public partial class Interpreter
 
         LogError(node, $"Failed to get value from property access node (path='{node.GetPath()}')");
         return result;
-    }
-    private ExecResult Execute(IndexAccessExpression node, ExecContext ctx) {
+    }*/
+    /*private ExecResult Execute(IndexAccessExpression node, ExecContext ctx) {
         var result = NewResult();
 
         var objResult = Execute(node.Object, ctx);
@@ -95,77 +95,7 @@ public partial class Interpreter
             result += property;
         }
 
-        return result;*/
-    }
-    private ExecResult Execute(BinaryOpExpression node, ExecContext ctx) {
-        var result = NewResult();
-
-
-        var leftResult  = ctx.EvaluateAsLValue(() => Execute(node.Left, ctx));
-        var rightResult = ctx.EvaluateAsRValue(() => Execute(node.Right, ctx));
-
-        var left  = leftResult.Get<Value>();
-        var right = rightResult.Get<Value>();
-
-
-        switch (node.Operator) {
-            case OperatorType.Assignment: {
-                left.SetValue(right);
-
-                result += left;
-
-
-                /*if (leftSymbol == null) {
-                    left.SetValue(right);
-
-                    /*
-                    if (left is {OuterObject: not null}) {
-
-                        if (node.Left is MemberAccessExpression n) {
-                            left.OuterObject.SetMember(n.Name, right);
-                            return result;
-                        }
-
-                        if (node.Left is IndexAccessExpression index) {
-                            if (index.Index is LiteralNumberNode num) {
-                                left.OuterObject.SetMember((int) num.UntypedValue, right);
-                                return result;
-                            }
-
-                            if (index.Index is StringNode str) {
-                                left.OuterObject.SetMember(str.NativeValue, right);
-                                return result;
-                            }
-
-                            LogError(node.Left, "Index must be a number or string");
-                            return result;
-                        }
-                    }
-
-                    LogError(node.Left, "Left side of assignment must be a variable");
-                    #1#
-
-                    return result;
-                }
-
-                leftSymbol.Val = right;
-                left           = leftSymbol.Val;
-
-                result += (leftSymbol, left);
-
-                return result;*/
-
-                return result;
-            }
-
-
-            default:
-                result += ExecuteOp(left, node.Operator, right, ctx);
-
-                break;
-        }
-
-        return result;
+        return result;#1#
     }
     private ExecResult Execute(ObjectLiteralExpression node, ExecContext ctx) {
         var result = NewResult();
@@ -198,7 +128,7 @@ public partial class Interpreter
         }
 
         result += rtObj;
-        */
+        #1#
 
         return result;
     }
@@ -224,7 +154,7 @@ public partial class Interpreter
         }
 
         result += arr;
-        */
+        #1#
 
         return result;
     }
@@ -246,54 +176,6 @@ public partial class Interpreter
             default:
                 throw new NotImplementedException($"Unhandled literal node type: {node.GetType().Name}");
 
-        }
-    }
-    private ExecResult Execute(ForLoopStatement node, ExecContext ctx) {
-        var result = NewResult();
-
-        using var _ = ctx.UsingScope();
-
-        Execute(node.Initialization, ctx);
-
-        while (true) {
-            var condition = Execute(node.Condition, ctx).Get<Value>();
-            if (!condition.IsTruthy())
-                break;
-            ExecuteBlock(node.Body, ctx, false);
-            var incrementResult = Execute(node.Increment, ctx).Get<Value>();
-            if (incrementResult.IsTruthy()) { }
-        }
-
-        return result;
-    }
-    private ExecResult Execute(UnaryOpExpression node, ExecContext ctx) {
-        var result = NewResult();
-
-        var res = Execute(node.Operand, ctx);
-        var (symbol, val) = ((VariableSymbol, Value)) res;
-
-
-        switch (node.Operator) {
-            case OperatorType.Not: {
-                var opRes  = ExecuteOp(val, node.Operator, null, ctx);
-                var newVal = opRes.Get<Value>();
-
-                result.Add(opRes);
-
-                return result;
-            }
-            case OperatorType.Increment:
-            case OperatorType.Decrement: {
-
-                var opRes  = ExecuteOp(val, node.Operator, Value.Number(1), ctx);
-                var newVal = opRes.Get<Value>();
-
-                result.Add(opRes);
-
-                return result;
-            }
-            default:
-                throw new NotImplementedException($"Unhandled operator type: {node.Operator}");
         }
     }
     private ExecResult Execute(VariableDeclarationNode node, ExecContext ctx) {
@@ -339,69 +221,8 @@ public partial class Interpreter
             // ctx.Symbols.Declare(node.VariableName);
             Execute(node.Assignment, ctx);
         }
-        */
+        #1#
 
-
-        return result;
-    }
-    private ExecResult Execute(MatchExpression node, ExecContext ctx) {
-        var result = NewResult();
-
-        var exprValue = Execute(node.MatchAgainstExpr, ctx).Get<Value>();
-
-        MatchCaseNode matchingCase = null;
-
-        foreach (var caseNode in node.Cases) {
-            var pattern = caseNode.Pattern;
-
-            if (pattern is LiteralPatternNode literalPattern) {
-                try {
-                    var literalValue = Execute(literalPattern.Literal, ctx).Get<Value>();
-                    if (literalValue.Operator_Equal(exprValue)) {
-                        matchingCase = caseNode;
-                        break;
-                    }
-                }
-                catch (FormatException) {
-                    // Handles cases where we try to convert a string like `hi' to a number
-                    continue;
-                }
-            }
-
-            if (pattern is IdentifierPatternNode variablePattern) {
-                var variableValue = Execute(variablePattern.Variable, ctx).Get<Value>();
-                if (variableValue.Operator_Equal(exprValue)) {
-                    matchingCase = caseNode;
-                    break;
-                }
-            }
-
-            if (pattern is TypePatternNode typePattern) {
-                var type = typePattern.ExpectedType.Get();
-                if (type == null) {
-                    LogError(typePattern, "Failed to get type from type pattern");
-                    continue;
-                }
-
-                if (exprValue.Type == type.Type) {
-                    matchingCase = caseNode;
-                    break;
-                }
-            }
-
-        }
-
-        if (matchingCase == null) {
-            matchingCase = node.DefaultCase;
-        }
-
-        if (node.DefaultCase == null) {
-            LogError(node, "No matching case found");
-        }
-
-        var caseResult = Execute(matchingCase.Body, ctx);
-
-        result += caseResult;
 
         return result;
     }
@@ -455,7 +276,7 @@ public partial class Interpreter
 
             return null;
         }
-        #1#
+        #2#
 
         if (rangeValue is not IIterable rangeIterable) {
             LogError(node, "Invalid range value");
@@ -495,7 +316,7 @@ public partial class Interpreter
             LogError(node, "Invalid range value");
             return result;
         }
-        #1#
+        #2#
 
         /*
         var rangeMaxValue = ValueFactory.Make(rangeMax);
@@ -508,7 +329,7 @@ public partial class Interpreter
             loopElementVar       = ctx.Variables.Declare(loopElementDecl.Name);
             loopElementVar.Value = GetElement(0);
         }
-        #1#
+        #2#
 
         /*while (true) {
             var condition = loopIndexVar.Value.Operator_LessThan(rangeMaxValue);
@@ -537,11 +358,11 @@ public partial class Interpreter
                     loopElementVar.Value = GetElement(idx);
                 }
             }
-        }#1#
-        */
+        }#2#
+        #1#
 
         return result;
-    }
+    }*/
     /*private ExecResult Execute(VariableNode node, ExecContext ctx) {
         var result = NewResult();
 

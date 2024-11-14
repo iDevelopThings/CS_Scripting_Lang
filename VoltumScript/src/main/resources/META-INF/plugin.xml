@@ -1,0 +1,130 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin xmlns:xi="http://www.w3.org/2001/XInclude" allow-bundled-update="true">
+    <resource-bundle>messages.VoltumBundle</resource-bundle>
+
+    <id>com.voltum.VoltumScript</id>
+
+    <!-- Public plugin name should be written in Title Case.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
+    <name>VoltumScript</name>
+
+    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
+    <vendor email="support@yourcompany.com" url="https://www.yourcompany.com">YourCompany</vendor>
+
+    <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
+         Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
+    <description><![CDATA[
+    Enter short description for your plugin here....<br>
+  ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.ultimate</depends>
+    <depends>com.intellij.modules.lang</depends>
+    <depends>com.redhat.devtools.lsp4ij</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="com.voltum.voltumscript.runtime.RuntimeSettings"/>
+
+        <fileType
+                name="Voltum"
+                implementationClass="com.voltum.voltumscript.lang.VoltumFileType"
+                fieldName="INSTANCE"
+                language="Voltum"
+                extensions="vlt"
+        />
+        <!-- Parsing -->
+        <lang.parserDefinition language="Voltum" implementationClass="com.voltum.voltumscript.parser.VoltumParserDefinition"/>
+        <!--                <lang.ast.factory language="Voltum" implementationClass="com.voltum.voltumscript.parser.VoltumASTFactory"/>-->
+
+        <stubElementTypeHolder class="com.voltum.voltumscript.psi.VoltumTypes" externalIdPrefix="voltum."/>
+        <!--                <lang.findUsagesProvider language="Voltum" implementationClass="com.voltum.voltumscript.lang.VoltumFindUsagesProvider"/>-->
+
+        <projectService
+                serviceInterface="com.voltum.voltumscript.psi.VoltumPsiManager"
+                serviceImplementation="com.voltum.voltumscript.psi.VoltumPsiManagerImpl"
+        />
+
+        <!--        <typeDeclarationProvider implementation="com.voltum.voltumscript.lang.VoltumTypeDeclarationProvider"/>-->
+        <!--        <psi.referenceContributor language="Voltum" implementation="com.voltum.voltumscript.lang.references.VoltumReferenceContributor"/>-->
+
+        <stubIndex implementation="com.voltum.voltumscript.lang.index.VoltumNamedElementIndex"/>
+        <stubIndex implementation="com.voltum.voltumscript.lang.index.VoltumTypeDeclarationIndex"/>
+        <stubIndex implementation="com.voltum.voltumscript.lang.index.VoltumValueIndex"/>
+
+        <additionalLibraryRootsProvider implementation="com.voltum.voltumscript.runtime.std.VoltumAdditionalLibraryRootsProvider"/>
+
+        <!-- Code Style -->
+        <langCodeStyleSettingsProvider implementation="com.voltum.voltumscript.ide.formatting.VoltumCodeStyleSettingsProvider"/>
+
+        <!-- Folding -->
+        <lang.foldingBuilder language="Voltum" implementationClass="com.voltum.voltumscript.ide.folding.VoltumFoldingBuilder"/>
+
+        <!-- Matchers -->
+        <lang.braceMatcher language="Voltum" implementationClass="com.voltum.voltumscript.ide.VoltumBraceMatcher"/>
+        <lang.quoteHandler language="Voltum" implementationClass="com.voltum.voltumscript.ide.VoltumQuoteHandler"/>
+        <typedHandler implementation="com.voltum.voltumscript.ide.VoltumTypedHandler" order="first, before completionAutoPopup"/>
+
+        <lang.commenter language="Voltum" implementationClass="com.voltum.voltumscript.ide.VoltumCommenter"/>
+
+        <!-- LSP -->
+        <!--        <platform.lsp.serverSupportProvider implementation="com.voltum.voltumscript.lsp.VoltumLspServerSupportProvider" id="voltum"/>-->
+
+        <!-- Completion -->
+        <!--        <completion.contributor language="Voltum" implementationClass="com.voltum.voltumscript.ide.completion.VoltumCompletionContributor"/>-->
+
+
+        <!-- Syntax Highlighting -->
+        <!--        <lang.syntaxHighlighter language="Voltum" implementationClass="com.voltum.voltumscript.ide.highlighting.VoltumSyntaxHighlighter"/>-->
+        <!--        <colorSettingsPage implementation="com.voltum.voltumscript.ide.highlighting.VoltumColorSettingsPage"/>-->
+        <!--        <annotator language="Voltum" implementationClass="com.voltum.voltumscript.ide.highlighting.VoltumHighlightingAnnotator"/>-->
+
+
+        <!-- Documentation -->
+        <lang.documentationProvider language="Voltum" implementationClass="com.voltum.voltumscript.ide.documentation.VoltumDocumentationProvider"/>
+
+        <toolWindow id="VoltumLSP" anchor="right" factoryClass="com.voltum.voltumscript.lsp.LspConsoleViewFactory" icon="/icons/Voltum.svg"/>
+
+        <!-- LSP -->
+
+        <!-- LSP textDocument/documentSymbol -->
+        <lang.psiStructureViewFactory language="Voltum" implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
+        <!-- LSP textDocument/documentSymbol -->
+        <lang.psiStructureViewFactory language="Voltum" implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
+
+
+    </extensions>
+
+    <actions>
+        <action id="Voltum.DumpLibMeta" class="com.voltum.voltumscript.runtime.std.DumpLibMetaAction">
+            <add-to-group group-id="RunToolbarMainActionGroup" anchor="last"/>
+        </action>
+        <action id="Voltum.ReloadLibMeta" class="com.voltum.voltumscript.runtime.std.ReloadLibMeta">
+            <add-to-group group-id="RunToolbarMainActionGroup" anchor="last"/>
+        </action>
+        <action id="Voltum.DumpTypeInformationAction" class="com.voltum.voltumscript.lang.types.DumpTypeInformationAction">
+            <add-to-group group-id="RunToolbarMainActionGroup" anchor="last"/>
+        </action>
+        <action id="Voltum.ShowEditorSemanticTokensAction" class="com.voltum.voltumscript.lsp.ShowEditorSemanticTokensAction">
+            <add-to-group group-id="RunToolbarMainActionGroup" anchor="last"/>
+        </action>
+        <!--<action id="com.voltum.voltumscript.lsp.ShowLspConsoleAction" class="com.voltum.voltumscript.lsp.ShowLspConsoleAction" text="ShowLSPConsole" description="Shows the Voltum LSP Console">
+            <add-to-group group-id="ActivateToolWindowActions" anchor="first"/>
+        </action>-->
+    </actions>
+
+    <!-- LSP -->
+
+    <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+        <server id="voltum" icon="/icons/Voltum.svg" name="Voltum LSP" factoryClass="com.voltum.voltumscript.lsp.lsp4ij.VoltumLanguageServerFactory">
+            <description><![CDATA[Voltum LSP Server]]></description>
+        </server>
+
+        <languageMapping language="Voltum" serverId="voltum" languageId="voltum" documentMatcher="com.voltum.voltumscript.lsp.lsp4ij.VoltumLspDocumentMatcher"/>
+        <fileTypeMapping fileType="Voltum" serverId="voltum" languageId="voltum" documentMatcher="com.voltum.voltumscript.lsp.lsp4ij.VoltumLspDocumentMatcher"/>
+        <!--        <fileNamePatternMapping patterns="*.vlt" serverId="voltum" languageId="voltum" documentMatcher="com.voltum.voltumscript.lsp.lsp4ij.VoltumLspDocumentMatcher"/>-->
+
+        <semanticTokensColorsProvider serverId="voltum" class="com.voltum.voltumscript.lsp.lsp4ij.VoltumSemanticTokensColorsProvider"/>
+    </extensions>
+
+</idea-plugin>

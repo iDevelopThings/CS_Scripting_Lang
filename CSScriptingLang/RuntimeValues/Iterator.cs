@@ -1,4 +1,5 @@
-﻿using CSScriptingLang.RuntimeValues.Values;
+﻿using CSScriptingLang.Interpreter.Context;
+using CSScriptingLang.RuntimeValues.Values;
 
 namespace CSScriptingLang.RuntimeValues;
 
@@ -7,12 +8,13 @@ public interface IIterator
     bool  MoveNext();
     Value Current      { get; }
     Value CurrentIndex { get; }
+    // Value MaxIndex     { get; }
     void  Reset();
 }
 
 public interface IIterable
 {
-    IIterator GetIterator();
+    IIterator GetIterator(ExecContext ctx);
 }
 
 public class NumberRangeIterator<TNative> : IIterator where TNative : struct
@@ -49,6 +51,7 @@ public class NumberRangeIterator<TNative> : IIterator where TNative : struct
 
     public Value Current      => _current;
     public Value CurrentIndex => _current;
+    public Value MaxIndex     => _end;
 
     public void Reset() {
         _current = _start;
@@ -81,6 +84,7 @@ public class ArrayIterator : IIterator
 
     // public int       CurrentIndex => _position;
     public Value CurrentIndex => _currentIndex;
+    public Value MaxIndex     => _array.As.Array().Count;
 
     public void Reset() {
         _position = -1;
@@ -114,6 +118,7 @@ public class ObjectIterator : IIterator
 
     public Value Current      => _fields[_position].Value;
     public Value CurrentIndex => _currentKey;
+    public Value MaxIndex     => _fields.Count;
 
     public void Reset() {
         _position = -1;
@@ -142,9 +147,9 @@ public class StringIterator : IIterator
         return inRange;
     }
 
-    public Value Current => _str[_position].ToString();
-
+    public Value Current      => _str[_position].ToString();
     public Value CurrentIndex => _currentIndex;
+    public Value MaxIndex     => _str.Length;
 
     public void Reset() {
         _position = -1;

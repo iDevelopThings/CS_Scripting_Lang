@@ -28,6 +28,9 @@ public class LanguageGlobalFunctionAttribute : LanguageFunctionAttribute
     public LanguageGlobalFunctionAttribute(string name) : base(name) { }
 }
 
+[AttributeUsage(AttributeTargets.Constructor | AttributeTargets.Method | AttributeTargets.Property)]
+public class LanguageFunctionDisableParameterChecks : Attribute { }
+
 [AttributeUsage(AttributeTargets.Parameter)]
 public class LanguageInstanceAttribute : Attribute { }
 
@@ -35,9 +38,14 @@ public class LanguageInstanceAttribute : Attribute { }
 public class LanguageParameterAttribute : Attribute
 {
     public bool IsOptional { get; set; }
+    public bool PassRawValue { get; set; }
 
     public LanguageParameterAttribute() { }
     public LanguageParameterAttribute(bool isOptional) {
         IsOptional = isOptional;
+    }
+    public LanguageParameterAttribute(bool isOptional, bool passRawValue) {
+        IsOptional = isOptional;
+        PassRawValue = passRawValue;
     }
 }

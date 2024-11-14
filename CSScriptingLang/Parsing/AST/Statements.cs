@@ -1,4 +1,5 @@
 ﻿using CSScriptingLang.Interpreter.Execution.Expressions;
+using CSScriptingLang.Interpreter.Execution.Statements;
 
 namespace CSScriptingLang.Parsing.AST;
 
@@ -11,22 +12,13 @@ public partial class ProgramExpression : BlockExpression
     [VisitableNodeProperty]
     public ModuleDeclarationNode ModuleDeclaration { get; set; }
 
+    public bool IsModule { get; set; }
+
+    public BlockExpression Body             => IsModule ? FirstOfType<InlineFunctionDeclaration>()?.Body : this;
+    public bool            HasTopLevelAwait => Body.Nodes.Any(n => n is AwaitStatement);
+    
     public ProgramExpression() { }
     public ProgramExpression(IEnumerable<BaseNode> statements) : base(statements) { }
-
-
-    public override string ToString(int indent = 0) {
-        var str = $"{new string(' ', indent)}{GetType().Name} {{\n";
-
-        if (Imports != null)
-            str += Imports.ToString(indent + 2) + "\n";
-
-        str += PrintNodes(indent + 2, "\n");
-
-        str += $"\n{new string(' ', indent)}}}";
-
-        return str;
-    }
 
     public void Combine(ProgramExpression other) {
         if (StartToken.Value == null && other.StartToken.Value != null)

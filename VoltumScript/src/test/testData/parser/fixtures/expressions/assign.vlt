@@ -1,0 +1,6 @@
+function main() {
+    // assignment exprs
+    var x = 1;
+    var y = x;  
+    var z = (x = y = 2);  
+}

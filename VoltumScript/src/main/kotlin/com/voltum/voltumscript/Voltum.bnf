@@ -1,0 +1,979 @@
+{
+    generate=[
+//        psi-classes-map="yes"
+//        token-sets="yes"
+//        elements="yes"
+    ]
+
+    parserClass="com.voltum.voltumscript.parser.VoltumParser"
+    parserUtilClass="com.voltum.voltumscript.parser.VoltumParserUtil"
+    psiImplUtilClass="com.voltum.voltumscript.psi.VoltumPsiUtilImpl"
+
+    implements='com.voltum.voltumscript.psi.VoltumElement'
+    extends='com.voltum.voltumscript.psi.VoltumElementImpl'
+
+    elementTypeHolderClass="com.voltum.voltumscript.psi.VoltumTypes"
+    elementTypeClass="com.voltum.voltumscript.psi.VoltumElementType"
+    tokenTypeClass="com.voltum.voltumscript.psi.VoltumTokenType"
+
+    psiClassPrefix="Voltum"
+    psiImplClassSuffix="Impl"
+    psiPackage="com.voltum.voltumscript.psi"
+    psiImplPackage="com.voltum.voltumscript.psi"
+
+//    elementTypeFactory('.*declaration|dictionary_expr|list_expr|dictionary_field|assign_expr|range_expr|add_expr|mul_expr|primary_expr|conditional_expr|call_expr|access_expr|path_expr|literal_value_expr|literal_int|literal_float|literal_string|literal_bool|literal_null')="com.voltum.voltumscript.lang.stubs.StubFactoryKt.factory"
+    elementTypeFactory('.*expr')="com.voltum.voltumscript.lang.stubs.StubFactoryKt.factory"
+
+
+//    generate=[token-accessors="yes"]
+    generateTokenAccessors=true
+
+    parserImports=[
+    ]
+    tokens=[
+        // LINE_COMMENT="regexp://.*"
+        // BLOCK_COMMENT="regexp:/\*.*?\*/"
+//        ID                  = "regexp:[a-zA-Z_][a-zA-Z_0-9]*"
+//        WHITE_SPACE         = "regexp:[ \t\n\r]+"       
+        
+        // Characters
+        COLON               = ':'
+        COLONCOLON          = '::'
+        DOT                 = '.'
+        COMMA               = ','
+        SEMICOLON           = ';'
+        LCURLY              = '{'
+        RCURLY              = '}'
+        LBRACK              = '['
+        RBRACK              = ']'
+        LPAREN              = '('
+        RPAREN              = ')'
+        BRACKET_PAIR        = '[]'
+        QUESTION            = '?'
+        TILDE               = '~'
+        
+        // Operators
+        OR                  = '|'
+        AND                 = '&'
+        EXCL                = '!'
+        EQ                  = '='
+        EXCLEQ              = '!='
+        EQEQ                = '=='
+        PLUSEQ              = '+='
+        PLUS                = '+'
+        PLUSPLUS            = '++'
+        MINUSEQ             = '-='
+        MINUS               = '-'
+        MINUSMINUS          = '--'
+        OREQ                = '|='
+        ANDAND              = '&&'
+        ANDEQ               = '&='
+        LT                  = '<'
+        XOREQ               = '^='
+        XOR                 = '^'
+        MULEQ               = '*='
+        MUL                 = '*'
+        DIVEQ               = '/='
+        DIV                 = '/'
+        REMEQ               = '%='
+        REM                 = '%'
+        GT                  = '>'
+        DOT                 = '.'
+        DOTDOT              = '..'
+        DOTDOTDOT           = '...'
+        FAT_ARROW           = '=>'
+        ARROW               = '->'
+
+        // Contextual tokens
+        GTGTEQ              = ">>="
+        GTGT                = ">>"
+        GTEQ                = ">="
+        LTLTEQ              = "<<="
+        LTLT                = "<<"
+        LTEQ                = "<="
+        OROR                = "||"
+        ANDAND              = "&&"
+                
+        // Keywords
+        VAR_KW              = 'var'
+        TYPE_KW             = 'type'
+        STRUCT_KW           = 'struct'
+        INTERFACE_KW        = 'interface'
+        ENUM_KW             = 'enum'
+        FUNC_KW             = 'function'
+        SIGNAL_KW           = 'signal'
+        RETURN_KW           = 'return'
+        BREAK_KW            = 'break'
+        CONTINUE_KW         = 'continue'
+        IF_KW               = 'if'
+        ELSE_KW             = 'else'
+        FOR_KW              = 'for'
+        DEFER_KW            = 'defer'
+        DEF_KW              = 'def'
+        ASYNC_KW            = 'async'
+        AWAIT_KW            = 'await'
+        COROUTINE_KW        = 'coroutine'
+        RANGE_KW            = 'range'
+        INT_KW              = "regexp:int|int32|i32"
+        FLOAT_KW            = "regexp:float|float32|f32"
+        DOUBLE_KW           = "regexp:double|float64|f64"
+        STRING_KW           = "regexp:string|str"
+        BOOL_KW             = "regexp:bool|boolean"
+        OBJECT_KW           = "regexp:object|Object"
+        ARRAY_KW            = "regexp:array|Array"
+        
+        // VALUE_NULL          = "regexp:null|NULL"
+        // VALUE_BOOL          = "regexp:true|false"
+        // VALUE_INTEGER       = "regexp:[0-9]+"
+        // VALUE_FLOAT         = "regexp:([-]?[0-9]*\.[0-9]+([Ee][+\-]?[0-9]+)?f|[-]?[0-9]+([Ee][+\-]?[0-9]+)?f)" // .0f 0.0f
+       
+    ]
+
+    extraRoot(".*code_fragment_element")=true
+    
+    consumeTokenMethod("((?!.*_with_recover).*_recover)|(.*_first)|(.*expr)") = "consumeTokenFast"
+    
+    extends(".*expr") = expr
+    elementType(".+binary_expr") = binary_expr
+    elementType(".+binary_op") = binary_op
+    
+//    extends("(single|tuple)_var_declaration")=variable_declaration
+
+}
+
+program ::= root_items
+
+expression_code_fragment_element ::= expr?
+statement_code_fragment_element ::= statement?
+
+//private ID_TOKEN ::= ID
+
+private top_level_declaration_first ::= FUNC_KW | SIGNAL_KW | TYPE_KW | ASYNC_KW | AWAIT_KW | DEF_KW | VAR_KW | FOR_KW | RETURN_KW | id | ID
+
+private root_item_with_recover ::= !<<eof>> top_level_declaration {
+  pin = 1
+  recoverWhile = root_item_recover
+}
+private root_item_recover ::= !top_level_declaration_first
+private root_items ::= root_item_with_recover*
+
+private top_level_declaration ::= (
+  type_declaration
+  | func_declaration 
+  | signal_declaration
+  | for_loop_statement
+  | statement
+  | !SIGNAL_KW expr
+) semi?
+//  | statement*
+{
+    mixin="com.voltum.voltumscript.psi.VoltumTypeDeclarationMixin"
+    implements="com.voltum.voltumscript.psi.VoltumDeclaration"
+}
+
+private id ::= <<parseIdent>> | ID {
+    methods=[nameIdentifier="ID"]
+}
+
+private nl ::= '\n' | '\r\n' | '\r'
+private semi ::= nl | ';' | <<eof>>
+
+//fake identifier ::= <<parseIdentifierType "id_identifier" >> {
+fake identifier ::= id {
+    mixin="com.voltum.voltumscript.psi.VoltumIdentifierMixin"
+    implements=[
+        "com.voltum.voltumscript.psi.VoltumIdent" 
+        "com.voltum.voltumscript.psi.VoltumReferenceElement"
+        "com.voltum.voltumscript.psi.ext.VoltumInferenceContextOwner"
+    ]
+    methods=[
+        getNameId
+        getNameIdentifier
+    ]
+}
+//fake identifier_reference ::= <<parseIdentifierType "id_identifier_reference" >> {
+fake identifier_reference ::= id {
+    extends=identifier
+    implements=[
+        "com.voltum.voltumscript.psi.VoltumReferenceElement"
+        "com.voltum.voltumscript.psi.ext.VoltumInferenceContextOwner"
+    ]
+}
+
+/** `var a = 1` - represents `a` */
+var_id ::= id {
+    extends=identifier
+    mixin="com.voltum.voltumscript.psi.VoltumVarIdMixin"
+}
+/** `type A struct` - represents `A` */
+type_id ::= id {extends=identifier}
+/** `function fn(int a) {}` - represents `a` */
+argument_id ::= id {extends=identifier}
+/** `function fn(int a) {}` - represents `fn` */
+func_id ::= id {extends=identifier}
+field_id ::= id {extends=identifier}
+/** `var a = b` - represents `b` */
+var_reference ::= id {extends=identifier_reference}
+
+
+/** 
+`function fn(int a) {}` - represents `int`
+`function fn(int a[]) {}` - represents `int[]`
+*/
+private type_name_id ::= id type_argument_list? {extends=identifier}
+/** int[] */
+private type_name_id_array ::= type_name_id '[]' {extends=identifier}
+/** `function fn(...int a) {}` */
+private variadic_type_id ::= '...' type_name_id {extends=identifier}
+
+type_ref ::= variadic_type_id | type_name_id | type_name_id_array {
+    methods=[
+        getReference
+        tryResolveType
+        array="BRACKET_PAIR"
+        typeArguments="type_argument_list"
+    ]
+    mixin="com.voltum.voltumscript.psi.VoltumTypeRefMixin"
+    implements=[
+        "com.voltum.voltumscript.psi.VoltumReferenceElement"
+        "com.voltum.voltumscript.psi.VoltumIdent"
+        "com.voltum.voltumscript.psi.ext.VoltumInferenceContextOwner"
+    ]
+}
+
+identifier_with_type ::= type_ref argument_id {
+    methods=[
+        nameIdentifier="argument_id"
+        type="type_ref"
+        getReference
+    ]
+}
+
+/*
+enum_id ::= ID {
+  methods=[getNameId getNameIdentifier]
+}
+enum_declaration ::= 'enum' enum_id '{' enum_fields? '}' {
+    extends="com.voltum.voltumscript.psi.VoltumEnumImpl"
+    implements="com.voltum.voltumscript.psi.VoltumEnum"
+    methods=[processDeclarations]
+}
+private enum_fields ::= enum_field_declaration*
+enum_field_declaration ::= (enum_value|enum_value_ctor) semi? {
+    mixin="com.voltum.voltumscript.psi.VoltumEnumFieldImpl"
+    implements="com.voltum.voltumscript.psi.VoltumEnumField"
+}
+private enum_value ::= ID '=' value_expr
+private enum_value_ctor ::= ID enum_value_ctor_arg_list
+
+enum_value_ctor_arg_list ::= "(" (enum_value_ctor_arg ("," enum_value_ctor_arg)*)? ")"
+enum_value_ctor_arg ::= (ID? type_ref) | type_ref
+*/
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// Attribute
+// 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+attribute ::= LBRACK (call_expr | id) RBRACK
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// Type Declaration - (struct, interface, enum)
+// 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+private type_declaration_header  ::= attribute* 'type' type_id ('struct' | 'interface' | 'enum')
+private type_declaration_member  ::= type_declaration_field_member | type_declaration_method_member | type_declaration_constructor
+type_declaration_field_member    ::= attribute* !DEF_KW var_id !argument_declaration_list type_ref semi? {
+    mixin="com.voltum.voltumscript.psi.VoltumTypeDeclarationMemberMixin"
+    methods=[
+        getPresentation
+    ]
+}
+type_declaration_method_member   ::= attribute* DEF_KW? ASYNC_KW? COROUTINE_KW? func_id argument_declaration_list type_ref? block_body? semi? {
+    mixin="com.voltum.voltumscript.psi.VoltumTypeDeclarationMemberMixin"
+    methods=[
+        isDef="DEF_KW"
+        nameIdentifier="func_id"
+        arguments="identifier_with_type"
+        returnType="type_ref"
+        getPresentation
+    ]
+}
+type_declaration_constructor     ::= attribute* DEF_KW? func_id argument_declaration_list block_body? semi? {
+    mixin="com.voltum.voltumscript.psi.VoltumTypeDeclarationMemberMixin"
+    methods=[
+        isDef="DEF_KW"
+        nameIdentifier="func_id"
+        arguments="identifier_with_type"
+        getPresentation
+    ]
+}
+type_declaration_body            ::= '{' type_declaration_member* '}' {
+    pin=1    
+    methods=[
+        fields="type_declaration_field_member"
+        methods="type_declaration_method_member"
+        constructors="type_declaration_constructor"
+    ]
+}
+type_declaration                 ::= attribute* type_declaration_header type_declaration_body
+{
+    mixin="com.voltum.voltumscript.psi.VoltumTypeDeclarationMixin"
+    implements=[
+        "com.voltum.voltumscript.psi.VoltumDeclaration"
+        "com.voltum.voltumscript.psi.ext.VoltumInferenceContextOwner"
+    ]
+    extends = "com.voltum.voltumscript.lang.stubs.VoltumStubbedElementImpl<?>"
+    stubClass = "com.voltum.voltumscript.psi.VoltumTypeDeclarationStub"
+    elementTypeFactory="com.voltum.voltumscript.lang.stubs.StubFactoryKt.factory"
+    methods=[
+        getPresentation
+        body="type_declaration_body"
+    ]
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// Statements - (if, for, return, defer)
+// 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+statement ::= 
+    if_statement
+    | for_loop_statement
+    | variable_declaration 
+    | return_expr 
+{
+    extends="com.voltum.voltumscript.psi.VoltumBaseStatementImpl"
+    implements="com.voltum.voltumscript.psi.VoltumBaseStatement"
+    methods=[processDeclarations]
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// IF STATEMENT
+// 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+//if_statement ::= 'if' ((!'(' any_expr)|paren_expr) block_body else_statement?
+if_statement ::= 'if' '(' any_expr ')' block_body else_statement?
+else_statement ::= 'else' else_chain
+private else_chain ::= (!('if' '{') block_body | if_statement) {
+    pin(".*")=1
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// FOR LOOPS
+// 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+// Loops:
+// for(var i = 0; i < 4; i++) { ... }
+// var j = 0; for(; j < 4; j++) { ... }
+// for(var i = 0; i < 4; i++) { ... }
+// for(var i = range 4) { ... }
+// var arr = [1, 2, '<bold.blue>surprise</> <yellow>numba 3</>', 4, 5];
+// for (var (i, el) = range arr) { ... }
+
+private for_initializer ::= variable_declaration? ';'?
+private for_condition ::= expr ';' 
+private for_update ::= expr 
+for_loop_statement ::= FOR_KW 
+( 
+    LPAREN
+        (for_initializer for_condition? for_update?) 
+    RPAREN 
+)?
+block_body
+{
+    pin(".*")=1
+}
+//private for_loop_recovers ::= !('{' | '}' | ';' | ')' | <<eof>>)
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// Variable Declaration
+// 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+//private var_decl ::= (single_var_declaration | tuple_var_declaration) 
+// variable declaration:
+// - `var a = 1`
+// - `var (a, b) = (1, 2)`
+variable_declaration ::= VAR_KW (
+    (!LPAREN var_id [ '=' any_expr ]) | 
+    (LPAREN (var_id ( ',' var_id )* ','?) RPAREN [ '=' (any_expr|tuple_expr_list) ])
+) {
+    elementTypeFactory="com.voltum.voltumscript.lang.stubs.StubFactoryKt.factory"
+    mixin="com.voltum.voltumscript.psi.VoltumVariableDeclarationMixin"
+    implements=["com.voltum.voltumscript.psi.VoltumReferenceElement"]
+    extends = "com.voltum.voltumscript.lang.stubs.VoltumStubbedElementImpl<?>"
+    stubClass = "com.voltum.voltumscript.psi.VoltumVariableDeclarationStub"
+    methods=[
+       getPresentation
+       getNameId getNameIdentifier
+       varName="/var_id[0]"
+       initializer="/expr[0]"
+       initializers="/expr"
+    ]
+}
+
+private tuple_expr_list ::= LPAREN <<comma_separated_list <<any_expr>> >> RPAREN {pin(".*")=1}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// BLOCK BODY / STATEMENT
+// 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+block_body ::= "{" block_statements "}" {
+    pin=1
+    extraRoot=true
+    methods=[]
+}
+private block_statements ::= block_statement*
+/*(statement | expr_statement_impl)*/
+private block_statement ::= !'}' (statement|expr) semi? {
+    pin = 1
+    recoverWhile = block_element_recover
+}
+private block_element_recover ::= !('}' | expr_first | VAR_KW | semi | id)
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// Function Declarations
+// 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+// - () => { ... }
+// - (int a) => { ... }
+// - function() { ... }
+anonymous_func ::= 
+    (ASYNC_KW? COROUTINE_KW? FUNC_KW argument_declaration_list [':' type_ref] block_body) 
+    | (ASYNC_KW? COROUTINE_KW? argument_declaration_list [':' type_ref] FAT_ARROW block_body)
+    | (ASYNC_KW? COROUTINE_KW? argument_declaration_list [':' type_ref] FAT_ARROW statement)
+{
+    elementTypeFactory="com.voltum.voltumscript.lang.stubs.StubFactoryKt.factory"    
+    extends="com.voltum.voltumscript.psi.VoltumFunctionMixin"
+    implements="com.voltum.voltumscript.psi.VoltumFunction"
+    methods=[
+        getPresentation
+        returnType="type_ref"
+        arguments="identifier_with_type"
+    ]
+}
+
+// function declaration:
+// - `def? async? coroutine? function name() type? {}?`
+func_declaration ::= attribute* DEF_KW? ASYNC_KW? COROUTINE_KW? FUNC_KW func_id type_argument_list? argument_declaration_list type_ref? block_body? {
+    pin = 'func_id'
+    elementTypeFactory="com.voltum.voltumscript.lang.stubs.StubFactoryKt.factory"
+    mixin="com.voltum.voltumscript.psi.VoltumFunctionMixin"
+    implements=[
+        "com.voltum.voltumscript.psi.VoltumFunction"
+        "com.voltum.voltumscript.psi.ext.VoltumInferenceContextOwner"
+    ]
+    extends = "com.voltum.voltumscript.lang.stubs.VoltumStubbedElementImpl<?>"
+    stubClass = "com.voltum.voltumscript.psi.VoltumFunctionStub"
+    methods=[
+        getPresentation        
+        returnType="type_ref"
+        arguments="identifier_with_type"
+        typeArguments="type_argument_list"
+    ]
+}
+
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// Signal Declaration
+// 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+signal_declaration ::= attribute* SIGNAL_KW id argument_declaration_list {
+    pin = 'id'
+    elementTypeFactory="com.voltum.voltumscript.lang.stubs.StubFactoryKt.factory"
+    implements=["com.voltum.voltumscript.psi.ext.VoltumInferenceContextOwner"]
+    extends = "com.voltum.voltumscript.lang.stubs.VoltumStubbedElementImpl<?>"
+    stubClass = "com.voltum.voltumscript.lang.stubs.VoltumPlaceholderStub<?>"
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// Dictionary
+// 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+// {a: 1, b: 2} | {'a':1, "b":2}
+dictionary_value ::= '{' dictionary_fields? '}' {  
+//    extends = expr
+    elementTypeFactory="com.voltum.voltumscript.lang.stubs.StubFactoryKt.factory"
+    mixin="com.voltum.voltumscript.psi.VoltumDictionaryMixin"
+    implements=["com.voltum.voltumscript.psi.VoltumValueTypeElement"]
+    extends = "com.voltum.voltumscript.lang.stubs.VoltumStubbedElementImpl<?>"
+    stubClass = "com.voltum.voltumscript.psi.VoltumDictionaryStub"
+    pin=1
+}
+dictionary_field ::= (field_id/*|literal_string|literal_int*/) ':' any_expr {
+    elementTypeFactory="com.voltum.voltumscript.lang.stubs.StubFactoryKt.factory"
+    extends = "com.voltum.voltumscript.lang.stubs.VoltumStubbedElementImpl<?>"
+    stubClass = "com.voltum.voltumscript.psi.VoltumDictionaryFieldStub"
+    methods=[
+        value="expr"
+    ]
+}
+private dictionary_fields ::= dictionary_field (',' dictionary_field)* ','?
+
+// Arrays/lists:
+// [1, 2, 3]
+list_value ::= '[' expr_list? ']' {    
+    pin=1
+    elementTypeFactory="com.voltum.voltumscript.lang.stubs.StubFactoryKt.factory"
+    mixin="com.voltum.voltumscript.psi.VoltumListMixin"
+    implements=["com.voltum.voltumscript.psi.VoltumValueTypeElement"]
+    extends = "com.voltum.voltumscript.lang.stubs.VoltumStubbedElementImpl<?>"
+    stubClass = "com.voltum.voltumscript.lang.stubs.VoltumPlaceholderStub<?>"
+}
+/*path_expr ::= access_path {
+    extends=expr
+    pin=1
+}*/
+/*fake path_expr ::= path (path_member_access*//*|path_index_access*//*)* {  
+    *//*extends=expr
+    implements=[
+        "com.voltum.voltumscript.psi.VoltumReferenceElement"
+        "com.voltum.voltumscript.psi.VoltumQualifiedReferenceElement"
+        "com.voltum.voltumscript.psi.ext.VoltumInferenceContextOwner"
+    ]
+    mixin="com.voltum.voltumscript.psi.VoltumPathExprMixin"
+    methods=[
+        getQualifier
+        leftMostQualifier
+        getTopMostPathParent
+        getPathParts
+        getQualifiers
+        getReference
+        getReferences
+    ]*//*
+}*/
+
+path ::= path_start (path_member_access | path_index_access)* type_argument_list? /*|path_index_access*/ {  
+    elementTypeFactory="com.voltum.voltumscript.lang.stubs.StubFactoryKt.factory"
+    implements=[
+        "com.voltum.voltumscript.psi.VoltumReferenceElement"
+        "com.voltum.voltumscript.psi.VoltumQualifiedReferenceElement"
+        "com.voltum.voltumscript.psi.ext.VoltumInferenceContextOwner"
+    ]
+    mixin="com.voltum.voltumscript.psi.VoltumPathExprMixin"
+    extends = "com.voltum.voltumscript.lang.stubs.VoltumStubbedElementImpl<?>"
+    stubClass = "com.voltum.voltumscript.lang.stubs.VoltumPlaceholderStub<?>"
+    methods=[
+        getLastVarReference
+        getQualifier
+        leftMostQualifier
+        getTopMostPathParent
+        getPathParts
+        getQualifiers
+        getReference
+        getReferences
+//        getTypeArguments
+//        typeArguments="type_argument_list"
+    ]
+}
+
+/*path_expr ::= path (path_member_access*//*|path_index_access*//*)* {  
+//    extends = expr
+    name="path_expr"
+    implements=[
+        "com.voltum.voltumscript.psi.VoltumReferenceElement"
+        "com.voltum.voltumscript.psi.VoltumQualifiedReferenceElement"
+        "com.voltum.voltumscript.psi.ext.VoltumInferenceContextOwner"
+    ]
+    mixin="com.voltum.voltumscript.psi.VoltumPathExprMixin"
+    methods=[
+        getQualifier
+        leftMostQualifier
+        getTopMostPathParent
+        getPathParts
+        getQualifiers
+        getReference
+        getReferences
+    ]
+}*/
+path_start ::= var_reference type_argument_list?  { 
+    elementType=path
+    methods=[
+        varReference="/var_reference"
+    ]
+}
+left path_member_access ::= '.' var_reference? { 
+    elementType=path
+    methods=[
+        varReference="/var_reference"
+    ]
+}
+left path_index_access ::= '[' any_expr ']' { 
+    elementType=path
+    methods=[
+        indexer="/indexer"
+    ]
+}
+
+call_expr ::= path? type_argument_list? '(' (expr_list)? ')' {
+    extends=expr
+    mixin="com.voltum.voltumscript.psi.VoltumCallExprMixin"
+    implements = [
+        "com.voltum.voltumscript.psi.VoltumReferenceElement"
+    ]
+    extends = "com.voltum.voltumscript.lang.stubs.VoltumStubbedElementImpl<?>"
+    stubClass = "com.voltum.voltumscript.lang.stubs.VoltumPlaceholderStub<?>"
+    methods=[
+        qualifier="/path"
+        getArguments
+        getTypeArguments
+//        typeArguments="type_argument_list"
+        getNameId
+        getNameIdentifier
+        getPresentation
+        setName
+        getLookupElement
+    ]
+}
+
+private expr_list ::= expr ( ',' expr )* ','?
+type_argument_list ::= LT <<comma_separated_list <<type_ref>> >> GT
+private var_id_list ::= <<comma_separated_list <<var_id>> >>
+
+fake literal_value ::= VALUE_INTEGER | VALUE_FLOAT | STRING_LITERAL | VALUE_BOOL | VALUE_NULL {
+    mixin="com.voltum.voltumscript.psi.VoltumLiteralMixin"
+    implements="com.voltum.voltumscript.psi.VoltumValueTypeElement"
+    extends = "com.voltum.voltumscript.lang.stubs.VoltumStubbedElementImpl<?>"
+    stubClass = "com.voltum.voltumscript.lang.stubs.VoltumPlaceholderStub<?>"
+} 
+
+literal_int ::= VALUE_INTEGER {
+    extends=literal_value
+    elementTypeFactory="com.voltum.voltumscript.lang.stubs.StubFactoryKt.factory"
+}
+literal_float ::= VALUE_FLOAT {
+    extends=literal_value
+    elementTypeFactory="com.voltum.voltumscript.lang.stubs.StubFactoryKt.factory"
+}
+literal_string ::= STRING_LITERAL {
+    extends=literal_value
+    elementTypeFactory="com.voltum.voltumscript.lang.stubs.StubFactoryKt.factory"
+}
+literal_bool   ::= VALUE_BOOL {
+    extends=literal_value
+    elementTypeFactory="com.voltum.voltumscript.lang.stubs.StubFactoryKt.factory"
+}
+literal_null   ::= VALUE_NULL {
+    extends=literal_value
+    elementTypeFactory="com.voltum.voltumscript.lang.stubs.StubFactoryKt.factory"
+}
+
+/*literal_value_expr ::= 
+      literal_int
+    | literal_float
+    | literal_string
+    | literal_bool
+    | literal_null
+    | dictionary_expr
+    | list_expr
+{
+    extends=primary_expr
+    extends = "com.voltum.voltumscript.lang.stubs.VoltumStubbedElementImpl<?>"
+    stubClass = "com.voltum.voltumscript.lang.stubs.VoltumPlaceholderStub<?>"
+    consumeTokenMethod = "consumeTokenFast"
+}*/
+private literal_value_expr_first ::= VALUE_INTEGER | VALUE_FLOAT | STRING_LITERAL | VALUE_BOOL | VALUE_NULL
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// Expressions
+// 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+private expr_first ::= RETURN_KW | '|' | '{' | '[' | '(' | '..' | '...'
+  | '+' | '-' | '*' | '!' | '&' | literal_value_expr_first | FOR_KW | IF_KW | CONTINUE_KW | BREAK_KW
+  | YIELD_KW | ASYNC_KW
+  
+
+return_expr   ::= RETURN_KW expr? { extends=expr }
+continue_expr ::= CONTINUE_KW { extends=expr }
+break_expr    ::= BREAK_KW literal_int? { extends=expr }
+// defer statement:
+// defer { ... }
+// defer func() { ... }
+defer_expr ::= DEFER_KW (anonymous_func | block_body) { extends=expr }
+range_expr ::= RANGE_KW expr { extends=expr }
+await_expr ::= AWAIT_KW expr { extends=expr }
+
+fake tuple_expr ::= LPAREN any_expr+ RPAREN {
+    extends = expr
+    pin = 2
+    methods=[elements="expr"]
+}
+fake paren_expr ::= LPAREN any_expr RPAREN {
+    extends = expr
+    pin = 1
+    methods=[elements="expr"]
+}
+
+tuple_or_paren_expr ::= LPAREN any_expr (tuple_expr_upper | RPAREN) {  
+    extends = expr
+    pin = 2
+    elementType = paren_expr
+    methods=[elements="expr"]
+}
+upper tuple_expr_upper ::= ',' [ any_expr (',' any_expr)* ','? ] RPAREN {   
+    extends = expr
+    pin = 1 
+    elementType = tuple_expr
+    methods=[elements="expr"]
+}
+
+fake binary_expr ::= expr binary_op expr {
+    extends=expr
+    mixin="com.voltum.voltumscript.psi.VoltumBinaryExprMixin"
+    methods=[
+        left="/expr[0]"
+        right="/expr[1]"
+        operator="binary_op"
+        toDisplayString
+    ]
+}
+//relational_binary_expr ::= expr relational_binary_op expr      { extends=binary_expr }
+assign_binary_expr     ::= expr assign_binary_op expr          { extends=binary_expr rightAssociative = true }
+comp_binary_expr       ::= expr comparison_binary_op expr      { extends=binary_expr }
+rel_comp_binary_expr   ::= expr relational_binary_op expr      { extends=binary_expr }
+bit_shift_binary_expr  ::= expr bit_shift_binary_op expr       { extends=binary_expr }
+add_binary_expr        ::= expr additive_binary_op expr        { extends=binary_expr }
+mul_binary_expr        ::= expr multiplicative_binary_op expr  { extends=binary_expr }
+
+
+fake binary_op ::= '|=' | '^=' | '&=' | '=' | '+=' | '-=' | '*=' | '/=' | '%='
+                 | '==' | '!=' | '<' | '>' | '<=' | '>='
+                 | '<<' | '>>' | '+' | '-' | '*' | '/' | '%'
+                 | '||' | '&&' | '|' | '&' | '^' {
+    mixin="com.voltum.voltumscript.psi.VoltumBinaryOpMixin"       
+    methods=[toDisplayString]          
+}
+           
+assign_binary_op          ::= '|=' | '^=' | '&=' | '=' | '+=' | '-=' | '*=' | '/=' | '%=' // { name = "operator" }      
+comparison_binary_op      ::= '==' | '!=' // { name = "operator" }
+relational_binary_op      ::= '<=' | '<' | '>=' | '>' // { name = "operator" }
+bit_shift_binary_op       ::= '<<' | '>>' // { name = "operator" }
+additive_binary_op        ::= '+' | '-' // { name = "operator" }
+multiplicative_binary_op  ::= '*' | '/' | '%' // { name = "operator" }
+bool_or_binary_op         ::= OROR // { name = "operator" }
+bool_and_binary_op        ::= ANDAND // { name = "operator" }
+bit_or_binary_op          ::= '|' // { name = "operator" }
+bit_and_binary_op         ::= '&' // { name = "operator" }
+bit_xor_binary_op         ::= '^' // { name = "operator" }
+
+// (a || b)
+bool_or_binary_expr    ::= expr bool_or_binary_op expr { extends=binary_expr }
+// (a && b)
+bool_and_binary_expr   ::= expr bool_and_binary_op expr { extends=binary_expr }
+// (a | b)
+bit_or_binary_expr     ::= expr !(OROR) bit_or_binary_op expr { extends=binary_expr }
+// (a & b)
+bit_and_binary_expr    ::= expr !(ANDAND) bit_and_binary_op expr { extends=binary_expr }
+// (a ^ b)
+bit_xor_binary_expr    ::= expr bit_xor_binary_op expr { extends=binary_expr }
+
+
+unary_expr ::= ('-' | '+' | '*' | '!' | '&') expr 
+
+fake prefix_expr ::= (PLUSPLUS | MINUSMINUS) expr {
+    extends=expr
+    methods=[toDisplayString getOperator]
+    mixin="com.voltum.voltumscript.psi.VoltumPrefixExprMixin"
+}
+fake postfix_expr ::= expr (PLUSPLUS | MINUSMINUS) {
+    extends=expr
+    methods=[toDisplayString getOperator]
+    mixin="com.voltum.voltumscript.psi.VoltumPostfixExprMixin"
+}
+
+prefix_inc_expr ::= inc expr {extends=prefix_expr}
+prefix_dec_expr ::= dec expr {extends=prefix_expr}
+postfix_inc_expr ::= expr inc {extends=postfix_expr}
+postfix_dec_expr ::= expr dec !expr_first {extends=postfix_expr}
+private inc ::= PLUSPLUS //'+' <<parseSecondPlusInIncrement>> 
+private dec ::= MINUSMINUS //'-' <<parseSecondMinusInDecrement>> 
+
+literal_expr ::=   
+      literal_int
+    | literal_float
+    | literal_string
+    | literal_bool
+    | literal_null
+{
+    extends=expr
+    mixin="com.voltum.voltumscript.psi.VoltumLiteralMixin"
+    implements="com.voltum.voltumscript.psi.VoltumValueTypeElement"
+    extends = "com.voltum.voltumscript.lang.stubs.VoltumStubbedElementImpl<?>"
+    stubClass = "com.voltum.voltumscript.lang.stubs.VoltumPlaceholderStub<?>"
+}
+
+atom_expr ::=   
+      literal_expr
+    | dictionary_value
+    | list_value
+    | path !'('
+    | call_expr 
+    | anonymous_func
+    | tuple_or_paren_expr 
+{
+    extends=expr
+    mixin="com.voltum.voltumscript.psi.VoltumExprMixin"
+    extends = "com.voltum.voltumscript.lang.stubs.VoltumStubbedElementImpl<?>"
+    stubClass = "com.voltum.voltumscript.lang.stubs.VoltumPlaceholderStub<?>"
+}
+
+any_expr ::= expr {
+    elementType=expr
+    name="expr"
+}
+
+/*
+statement_mode_expr ::= expr // <<exprMode 'StructLiteralsMode.ON' 'StmtMode.ON' expr>>
+{
+  elementType = expr
+  name = "expr"
+}
+
+fake expr_statement ::= any_expr semi? {
+    extends=statement
+}
+
+expr_statement_impl ::= statement_mode_expr *//*(&'}' | expr_statement_semi)?*//* {
+  elementType = expr_statement
+  name = "statement"
+}*/
+
+expr ::= 
+      return_expr
+    | continue_expr
+    | break_expr
+    | defer_expr
+    | range_expr
+    | await_expr
+    | assign_binary_expr
+    | bool_or_binary_expr
+    | bool_and_binary_expr
+    | comp_binary_expr
+    | rel_comp_binary_expr
+    | bit_or_binary_expr
+    | bit_xor_binary_expr
+    | bit_and_binary_expr
+    | bit_shift_binary_expr
+    | prefix_inc_expr
+    | prefix_dec_expr
+    | postfix_inc_expr
+    | postfix_dec_expr
+    | add_binary_expr
+    | mul_binary_expr
+    | unary_expr
+    | atom_expr
+{
+    extraRoot=true
+    mixin="com.voltum.voltumscript.psi.VoltumExprMixin"
+    extends = "com.voltum.voltumscript.lang.stubs.VoltumStubbedElementImpl<?>"
+    stubClass = "com.voltum.voltumscript.lang.stubs.VoltumPlaceholderStub<?>"
+    generateTokenAccessors=false
+}
+    
+//assignment_expr      ::= logical_or_expr assign_binary_op expr { extends=expr rightAssociative=true}
+//conditional_expr     ::= logical_or_expr '?' expr ':' expr { extends=expr}
+//logical_or_expr      ::= logical_and_expr bool_or_binary_op expr { extends=expr}
+//logical_and_expr     ::= equality_expr bool_and_binary_op expr { extends=expr}
+//equality_expr        ::= relational_expr comparison_binary_op expr { extends=expr}
+//relational_expr      ::= atom_expr relational_binary_op expr  { extends=expr }
+//relational_expr      ::= additive_expr relational_binary_op expr  { extends=expr}
+//additive_expr        ::= multiplicative_expr ('+' | '-') expr { extends=expr}
+//multiplicative_expr  ::= /*unary_expr |*/ unary_expr ('*' | '/' | '%') expr { extends=expr}
+//unary_expr           ::= atom_expr | ('!' | '-' | '+') expr {extends=expr}
+                    
+/*expr ::=
+    call_group
+    | conditional_expr 
+    | assign_expr
+    | add_expr
+    | mul_expr
+    | primary_expr
+{
+    extraRoot=true
+    pin(".*")=1
+    implements="com.voltum.voltumscript.psi.VoltumExpr"
+    mixin="com.voltum.voltumscript.psi.VoltumExprMixin"
+    extends = "com.voltum.voltumscript.lang.stubs.VoltumStubbedElementImpl<?>"
+    stubClass = "com.voltum.voltumscript.lang.stubs.VoltumPlaceholderStub<?>"
+} 
+conditional_expr ::= expr ('<' | '>' | '<=' | '>=' | '==' | '!=' | '&&' | '||') expr {
+    pin(".*")=1
+    extends=expr
+}
+assign_expr ::= add_expr '=' RANGE_KW? assign_expr {
+    extends=expr
+}  
+add_expr ::= add_expr ('+='|'+'|'-='|'-') mul_expr {    
+    extends=expr
+}
+mul_expr ::= mul_expr ('*'|'*='|'/'|'/=') primary_expr {
+    extends=expr
+}
+
+primary_expr ::= 
+    literal_value_expr 
+//    | var_reference
+    | path_expr 
+//    | access_expr
+    | paren_expr 
+    | call_group 
+{
+    extends=expr
+}
+
+private paren_expr ::= '(' [ !')' expr (',' expr) * ] ')'
+
+*/
+   
+// private eqeq   ::= <<eqeqOperator>>
+// private gtgteq ::= <<gtgteqOperator>>
+// private gtgt   ::= <<gtgtOperator>>
+// private gteq   ::= <<gteqOperator>>
+// private ltlteq ::= <<ltlteqOperator>>
+// private ltlt   ::= <<ltltOperator>>
+// private lteq   ::= <<lteqOperator>>
+// private oror   ::= <<ororOperator>>
+// private andand ::= <<andandOperator>>
+
+private meta any_braces ::= <<parseAnyBraces <<param>>>>
+private meta comma_separated_list ::= <<param>> ( ',' <<param>> )* ','?
+// one of:
+// - ()
+// - (int a,)
+// - (int a, int b)
+private meta optional_argument_list ::= <<parseLParens <<comma_separated_list <<param>>>>>>
+
+//private argument_declaration_list ::= "(" (identifier_with_type ("," identifier_with_type)*)? ")" {
+private argument_declaration_list ::= "(" <<comma_separated_list <<identifier_with_type>> >>? ")" {
+    methods=[
+        getPresentation
+        arguments="identifier_with_type"
+    ]
+}
+
+// "(" (argument_declaration ("," argument_declaration)*)? ")"

@@ -1,11 +1,10 @@
 ﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Text;
-using Alba.CsConsoleFormat;
+using CSScriptingLang.Core.Diagnostics;
 using CSScriptingLang.Lexing;
 using CSScriptingLang.Utils;
 
-namespace Engine.Engine.Logging;
+namespace CSScriptingLang.Core.Logging;
 
 [Flags]
 public enum LoggerFlags
@@ -149,17 +148,9 @@ public class Logger
     public void Fatal(string text, Caller          caller, params object[] args) => ConstructAndLogMessage(LogLevel.Fatal, caller, string.Format(text, args));
 
     public void Exception(Exception ex) {
-        Caller caller;
-        if (ex is BaseLanguageException ble) {
-            caller = ble.Caller;
-        } else {
-            caller = Caller.FromException(ex);
-        }
-        
-        if(!caller.IsValid())
-            caller = Caller.FromException(ex);
+        var caller = Caller.TryGetFromException(ex);
 
-        var isFatal = ex is FatalInterpreterException;
+        var isFatal = ex is FatalDiagnosticException;
         Create(caller)
            .WithSeverity(isFatal ? LogLevel.Fatal : LogLevel.Error)
            .WithMessage(ex.Message)

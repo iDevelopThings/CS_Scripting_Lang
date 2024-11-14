@@ -35,6 +35,10 @@ public partial class UnaryOpExpression : Expression
                 var opRes = value.Operator(Operator, Value.Number(1));
                 return ctx.ValReference(opRes);
             }
+            case OperatorType.Minus: {
+                var opRes = value.Operator(OperatorType.Multiply, Value.Int32(-1));
+                return ctx.ValReference(opRes);                
+            }
             default:
                 throw new NotImplementedException($"Unhandled operator type: {Operator}");
         }

@@ -1,183 +1,162 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using CSScriptingLangGenerators.Utils;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace CSScriptingLangGenerators.Bindings;
 
 public static class TypeData
 {
-    public static INamedTypeSymbol Value      { get; private set; }
-    public static INamedTypeSymbol ValueList  { get; private set; }
-    public static IArrayTypeSymbol ValueArray { get; private set; }
+    public static HashSet<INamedTypeSymbol> WrappableClasses { get; set; } = new(SymbolEqualityComparer.Default);
+
+    public static HashSet<ModuleTypeData>    Modules    { get; set; } = new();
+    public static HashSet<ClassTypeData>     Classes    { get; set; } = new();
+    public static HashSet<PrototypeTypeData> Prototypes { get; set; } = new();
+
+    public static HashSet<TypeMeta_Module> AdditionalModuleTypeMeta { get; set; } = new();
+
+    public static List<TypeMeta_ClassBased> AllTypeMeta = new();
+    /*
+    public static IEnumerable<TypeMeta_ClassBased> AllTypeMeta => Modules
+       .Concat(Classes)
+       .Concat(Prototypes)
+       .OrderByDescending(c => c.CreationTime)
+       .Select(c => c.Meta)
+       .Concat(AdditionalModuleTypeMeta)
+       .Distinct(TypeMeta_ClassBased.TypeMetaClassBasedComparer);
+       */
+
+
+    public static INamedTypeSymbol Value                     { get; private set; }
+    public static INamedTypeSymbol ValueList                 { get; private set; }
+    public static IArrayTypeSymbol ValueArray                { get; private set; }
+    public static INamedTypeSymbol ValueDict                 { get; private set; }
+    public static INamedTypeSymbol WrappedValue              { get; private set; }
+    public static INamedTypeSymbol InlineFunctionDeclaration { get; private set; }
+
+    public static INamedTypeSymbol ILibraryInterface     { get; private set; }
+    public static INamedTypeSymbol ILibraryImplInterface { get; private set; }
 
     public static INamedTypeSymbol Prototype { get; private set; }
 
-    public static INamedTypeSymbol BaseValue   { get; private set; }
-    public static INamedTypeSymbol ValueObject { get; private set; }
-    public static INamedTypeSymbol ValueString { get; private set; }
-    public static INamedTypeSymbol RTVT        { get; set; }
+    public static INamedTypeSymbol RTVT { get; set; }
 
-    public static INamedTypeSymbol ExecContext                    { get; private set; }
-    public static INamedTypeSymbol FnExecContext                  { get; set; }
-    public static INamedTypeSymbol NativeFunctionExecutionContext { get; set; }
+    public static INamedTypeSymbol ExecContext   { get; private set; }
+    public static INamedTypeSymbol FnExecContext { get; set; }
 
-    public static INamedTypeSymbol Void   { get; private set; }
-    public static INamedTypeSymbol String { get; private set; }
-    public static INamedTypeSymbol Bool   { get; private set; }
+    public static INamedTypeSymbol Double   { get; private set; }
+    public static INamedTypeSymbol Float    { get; private set; }
+    public static INamedTypeSymbol Int      { get; private set; }
+    public static INamedTypeSymbol Long     { get; private set; }
+    public static INamedTypeSymbol Void     { get; private set; }
+    public static INamedTypeSymbol String   { get; private set; }
+    public static INamedTypeSymbol Bool     { get; private set; }
+    public static INamedTypeSymbol Nullable { get; private set; }
+    public static INamedTypeSymbol Task     { get; private set; }
+    public static INamedTypeSymbol TaskOfT  { get; private set; }
 
-    public static INamedTypeSymbol BaseValueList  { get; private set; }
-    public static IArrayTypeSymbol BaseValueArray { get; private set; }
-    public static INamedTypeSymbol BaseValueDict  { get; private set; }
+    public static Dictionary<string, INamedTypeSymbol> PrototypeMap = new();
 
-
-    public static HashSet<INamedTypeSymbol> ValueTypes  { get; private set; }
-    public static HashSet<ITypeSymbol>      NumberTypes { get; private set; }
+    public static HashSet<ITypeSymbol> NumberTypes { get; private set; }
 
 
     public static Dictionary<ITypeSymbol, List<ValueType>> TypeCheckMap { get; private set; }
 
     public struct OperatorData
     {
-        public string Name       { get; set; }
-        public string Token      { get; set; }
-        public string Identifier { get; set; }
+        public string Name                   { get; set; }
+        public string Token                  { get; set; }
+        public string Identifier             { get; set; }
+        public string OperatorOverloadFnName => $"operator_{Identifier}";
     }
 
     public static Dictionary<string, OperatorData> Operators           { get; private set; }
     public static Dictionary<string, OperatorData> OperatorsByOperator => Operators.Values.ToDictionary(o => o.Token, o => o);
+    public static Dictionary<string, OperatorData> OperatorsByIdent    => Operators.Values.ToDictionary(o => o.Identifier, o => o);
 
-    public static bool Initialize(GeneratorExecutionContext context) {
 
+    public static INamedTypeSymbol SyntaxElementSymbol { get; set; }
+    public static INamedTypeSymbol SyntaxNodeSymbol    { get; set; }
+    public static INamedTypeSymbol SyntaxTokenSymbol   { get; set; }
+
+    public static bool Initialize(
+        Compilation        compilation,
+        Action<Diagnostic> reportDiagnostic
+    ) {
         try {
-            var compilation = context.Compilation;
 
-            var doubleSym   = compilation.GetSpecialType(SpecialType.System_Double);
-            var floatSym    = compilation.GetSpecialType(SpecialType.System_Single);
-            var intSym      = compilation.GetSpecialType(SpecialType.System_Int32);
-            var longSym     = compilation.GetSpecialType(SpecialType.System_Int64);
-            var voidSym     = compilation.GetSpecialType(SpecialType.System_Void);
-            var stringSym   = compilation.GetSpecialType(SpecialType.System_String);
-            var boolSym     = compilation.GetSpecialType(SpecialType.System_Boolean);
-            var nullableSym = compilation.GetSpecialType(SpecialType.System_Nullable_T);
+            Double   = compilation.GetSpecialType(SpecialType.System_Double);
+            Float    = compilation.GetSpecialType(SpecialType.System_Single);
+            Int      = compilation.GetSpecialType(SpecialType.System_Int32);
+            Long     = compilation.GetSpecialType(SpecialType.System_Int64);
+            Void     = compilation.GetSpecialType(SpecialType.System_Void);
+            String   = compilation.GetSpecialType(SpecialType.System_String);
+            Bool     = compilation.GetSpecialType(SpecialType.System_Boolean);
+            Nullable = compilation.GetSpecialType(SpecialType.System_Nullable_T);
+            Task     = compilation.GetTypeByMetadataName("System.Threading.Tasks.Task");
+            TaskOfT  = compilation.GetTypeByMetadataName("System.Threading.Tasks.Task`1");
 
-            ExecContext                    = compilation.GetBestTypeByMetadataName($"{Constants.RootNamespace}.Interpreter.Context.ExecContext");
-            FnExecContext                  = compilation.GetBestTypeByMetadataName($"{Constants.RootNamespace}.Interpreter.Context.FunctionExecContext");
-            NativeFunctionExecutionContext = compilation.GetBestTypeByMetadataName($"{Constants.RootNamespace}.Interpreter.Bindings.NativeFunctionExecutionContext");
-            RTVT                           = compilation.GetBestTypeByMetadataName($"{Constants.RootNamespace}.RuntimeValues.Types.RTVT");
+            ExecContext               = compilation.GetBestTypeByMetadataName($"{Constants.RootNamespace}.Interpreter.Context.ExecContext");
+            FnExecContext             = compilation.GetBestTypeByMetadataName($"{Constants.RootNamespace}.Interpreter.Context.FunctionExecContext");
+            RTVT                      = compilation.GetBestTypeByMetadataName($"{Constants.RootNamespace}.RuntimeValues.Types.RTVT");
+            Prototype                 = compilation.GetBestTypeByMetadataName($"{Constants.RootNamespace}.RuntimeValues.Prototypes.Prototype");
+            Value                     = compilation.GetBestTypeByMetadataName($"{Constants.RootNamespace}.RuntimeValues.Values.Value");
+            ILibraryInterface         = compilation.GetBestTypeByMetadataName($"{Constants.RootNamespace}.Interpreter.Libraries.ILibrary");
+            ILibraryImplInterface     = compilation.GetBestTypeByMetadataName($"{Constants.RootNamespace}.Interpreter.Libraries.ILibraryImpl");
+            WrappedValue              = compilation.GetBestTypeByMetadataName($"{Constants.RootNamespace}.RuntimeValues.Values.WrappedValue");
+            InlineFunctionDeclaration = compilation.GetBestTypeByMetadataName($"{Constants.RootNamespace}.Interpreter.Execution.Expressions.InlineFunctionDeclaration");
 
-            var valueSym = compilation.GetBestTypeByMetadataName($"{Constants.RootNamespace}.RuntimeValues.Values.BaseValue");
-            // .SingleOrDefault(s => s.ContainingAssembly.Identity.Name == Constants.AssemblyName);
-
-            if (valueSym == null) {
-                context.ReportDiagnostic(Diagnostic.Create(Diagnostics.BaseValueNotFound, Location.None));
-                return false;
-            }
-
-            Prototype = compilation.GetBestTypeByMetadataName($"{Constants.RootNamespace}.RuntimeValues.Prototypes.Prototype");
-            Value     = compilation.GetBestTypeByMetadataName($"{Constants.RootNamespace}.RuntimeValues.Values.Value");
-
-            ValueTypes  = new HashSet<INamedTypeSymbol>(valueSym.GetDerivedTypes(), SymbolEqualityComparer.Default);
-            ValueObject = ValueTypes.First(t => t.Name == "ValueObject");
-            ValueString = ValueTypes.First(t => t.Name == "ValueString");
+            SyntaxElementSymbol = compilation.GetTypeByMetadataName($"{Constants.RootNamespace}.IncrementalParsing.Syntax.SyntaxNodes.SyntaxElement");
+            SyntaxNodeSymbol    = compilation.GetTypeByMetadataName($"{Constants.RootNamespace}.IncrementalParsing.Syntax.SyntaxNodes.SyntaxNode");
+            SyntaxTokenSymbol   = compilation.GetTypeByMetadataName($"{Constants.RootNamespace}.IncrementalParsing.Syntax.SyntaxNodes.SyntaxToken");
 
             var operatorsEnum = compilation.GetTypeByMetadataName($"{Constants.RootNamespace}.Lexing.OperatorType");
             if (operatorsEnum == null) {
-                context.ReportDiagnostic(Diagnostic.Create(Diagnostics.MissingOperandType, Location.None));
+                reportDiagnostic?.Invoke(Diagnostic.Create(Diagnostics.MissingOperandType, Location.None));
                 return false;
             }
 
             Operators = operatorsEnum.GetMembers()
                .OfType<IFieldSymbol>()
-               .Select(f => {
-                    var attr = f.GetAttribute("OperatorChars");
-                    return new OperatorData {
-                        Name       = f.Name,
-                        Identifier = attr?.GetArgument<string>(1),
-                        Token      = attr?.GetArgument<string>()
-                    };
-                })
-               .Where(o => o.Token != null && o.Identifier != null)
-               .ToDictionary(o => o.Name, o => o);
-
-            /*
-            var operatorsEnumDeclaration = operatorsEnum.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as EnumDeclarationSyntax;
-            if (operatorsEnumDeclaration != null) {
-                var operatorsEnumMembers = operatorsEnumDeclaration!.Members
-                   .Select(m => new {
-                        Name = m.Identifier.Text,
-                        OperatorToken = m.AttributeLists
-                           .SelectMany(a => a.Attributes)
-                           .Where(a => a.Name is IdentifierNameSyntax {Identifier.Text: "OperatorChars"})
-                           .Select(a => a.ArgumentList)
-                           .SelectMany(a => a.Arguments)
-                           .Select(a => a.Expression)
-                           .OfType<LiteralExpressionSyntax>()
-                           .Select(l => l.Token.ValueText)
-                           .FirstOrDefault()
-                    });
-
-                Operators = operatorsEnumMembers.ToDictionary(
-                    m => m.Name,
-                    m => new OperatorData() {
-                        Token = m.OperatorToken
+               .Select(
+                    f => {
+                        var attr = f.GetAttribute("OperatorChars");
+                        return new OperatorData {
+                            Name       = f.Name,
+                            Identifier = attr?.GetArgument<string>(1),
+                            Token      = attr?.GetArgument<string>(),
+                        };
                     }
-                );
-            } else {
-                Operators = operatorsEnum.GetMembers()
-                   .OfType<IFieldSymbol>()
-                   .ToDictionary(
-                        f => f.Name,
-                        f => {
-                            var attr = f.GetAttributes().GetAttribute("OperatorChars");
-
-                            return new OperatorData() {
-                                Token      = attr?.GetArgument<string>(),
-                                Identifier = attr?.GetArgument<string>(1),
-                            };
-                        }
-                    );
-            }
-            */
-
-            Void   = voidSym;
-            String = stringSym;
-            Bool   = boolSym;
-
-            BaseValue = valueSym;
+                )
+               .Where(o => o is {Token: not null, Identifier: not null})
+               .ToDictionary(o => o.Name, o => o);
 
             ValueList  = compilation.GetBestTypeByMetadataName("System.Collections.Generic.List`1")?.Construct(Value);
             ValueArray = compilation.CreateArrayTypeSymbol(Value);
-
-            BaseValueList  = compilation.GetBestTypeByMetadataName("System.Collections.Generic.List`1")?.Construct(valueSym);
-            BaseValueArray = compilation.CreateArrayTypeSymbol(valueSym);
-            BaseValueDict  = compilation.GetBestTypeByMetadataName("System.Collections.Generic.Dictionary`2")?.Construct(String, valueSym);
+            ValueDict  = compilation.GetBestTypeByMetadataName("System.Collections.Generic.Dictionary`2")?.Construct(String, Value);
 
             TypeCheckMap = new Dictionary<ITypeSymbol, List<ValueType>>(SymbolEqualityComparer.Default) {
-                {doubleSym, [ValueType.Double]},
-                {floatSym, [ValueType.Float]},
-                {intSym, [ValueType.Int32]},
-                {longSym, [ValueType.Int64]},
-                {stringSym, [ValueType.String]},
-                {boolSym, [ValueType.Boolean]},
-                {valueSym, [ValueType.Any]},
-                {ValueObject, [ValueType.Object]},
-                {ValueString, [ValueType.String]},
+                {Double, [ValueType.Double]},
+                {Float, [ValueType.Float]},
+                {Int, [ValueType.Int32]},
+                {Long, [ValueType.Int64]},
+                {String, [ValueType.String]},
+                {Bool, [ValueType.Boolean]},
             };
 
             NumberTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default) {
-                doubleSym,
-                floatSym,
-                intSym,
-                longSym
+                Double,
+                Float,
+                Int,
+                Long
             };
+
+            Prototype.GetDerivedTypes().ForEach(t => PrototypeMap[t.Name] = t);
 
         }
         catch (InvalidOperationException e) {
-            context.ReportDiagnostic(Diagnostic.Create(Diagnostics.FailedToInitialize, Location.None, $"{e.Message}\n{e.StackTrace}"));
+            reportDiagnostic?.Invoke(Diagnostic.Create(Diagnostics.FailedToInitialize, Location.None, $"{e.Message}\n{e.StackTrace}"));
             return false;
         }
 
@@ -207,7 +186,8 @@ public enum ValueType
     Float,
     Double,
     String,
-    Function
+    Function,
+    WrappedValue,
 }
 
 public static class ValueTypeExtensions
@@ -217,6 +197,7 @@ public static class ValueTypeExtensions
             case ValueType.Unit:
             case ValueType.Null:
             case ValueType.Any:
+            case ValueType.WrappedValue:
                 return false;
 
             case ValueType.Boolean:

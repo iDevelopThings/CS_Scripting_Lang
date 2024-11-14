@@ -2,7 +2,8 @@
 using CSScriptingLang.Interpreter.Context;
 using CSScriptingLang.RuntimeValues.Types;
 using CSScriptingLang.RuntimeValues.Values;
-using Engine.Engine.Logging;
+using CSScriptingLang.Core.Logging;
+using CSScriptingLang.RuntimeValues.Prototypes;
 
 namespace CSScriptingLang.Interpreter.Libraries;
 
@@ -17,6 +18,8 @@ public static partial class Lib_Logging
     // }
 
     [LanguageGlobalFunction("print")]
+    [LanguageBindTypeHint("object", typeof(ObjectPrototype))]
+    [LanguageFunctionDisableParameterChecks]
     public static void Print(params Value[] args) {
 
         if (args == null) {

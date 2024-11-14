@@ -1,0 +1,1 @@
+﻿global using LSPDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;

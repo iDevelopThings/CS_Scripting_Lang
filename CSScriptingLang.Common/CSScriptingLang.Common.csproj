@@ -1,12 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-<!--        <TargetFramework>net8.0</TargetFramework>-->
+<!--        <TargetFramework>net9.0</TargetFramework>-->
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>disable</Nullable>
         <RootNamespace>CSScriptingLang.Common</RootNamespace>
         <TargetPlatformIdentifier>Windows</TargetPlatformIdentifier>
         <TargetFramework>net8.0-windows</TargetFramework>
+        <SuppressNETCoreSdkPreviewMessage>true</SuppressNETCoreSdkPreviewMessage>
+        <NoWarn>NU1901;NU1902;NU1903;NU1904</NoWarn>
     </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="JetBrains.Annotations" Version="2024.2.0" />
+    </ItemGroup>
 
 </Project>

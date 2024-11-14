@@ -1,4 +1,5 @@
-﻿using CSScriptingLang.Interpreter.Context;
+﻿using CSScriptingLang.Core.Diagnostics;
+using CSScriptingLang.Interpreter.Context;
 using CSScriptingLang.Interpreter.Execution.Expressions;
 using CSScriptingLang.Lexing;
 using CSScriptingLang.Parsing.AST;
@@ -20,7 +21,7 @@ public partial class DeferStatement : Statement
         if (ctx is FunctionExecContext) {
             ctx.PushDefer(Expression);
         } else {
-            throw new FatalInterpreterException("Defer statement outside of function context", this);
+            DiagnosticManager.Diagnostic_Error_Fatal().Message("Defer statement outside of function context").Range(this).Report();
         }
 
         return Maybe.Nothing<ValueReference>();

@@ -1,5 +1,9 @@
 ﻿using CSScriptingLang.Interpreter.Context;
+using CSScriptingLang.Interpreter.Modules;
 using CSScriptingLang.Parsing.AST;
+using CSScriptingLang.RuntimeValues.Prototypes;
+using CSScriptingLang.RuntimeValues.Prototypes.Types;
+using CSScriptingLang.RuntimeValues.Types;
 using CSScriptingLang.RuntimeValues.Values;
 
 namespace CSScriptingLang.Interpreter.Execution.Expressions;
@@ -12,6 +16,8 @@ public partial class ArrayLiteralExpression : LiteralValueExpression
 
     public ArrayLiteralExpression(object value = null) : base(value) { }
 
+    public override ITypeAlias GetTypeAlias() => TypeAlias<ArrayPrototype>.Get();
+
     public override ValueReference Execute(ExecContext ctx) {
         var elements = Elements.Select(e => {
             var value = e.Execute(ctx).Value;
@@ -19,7 +25,11 @@ public partial class ArrayLiteralExpression : LiteralValueExpression
         });
 
         var arr = Value.Array(elements);
-        
+
         return ctx.ValReference(arr);
+    }
+
+    public override IEnumerable<Ty> ResolveTypes(ExecContext ctx, DefinitionSymbol symbol) {
+        yield return TypeAlias<ArrayPrototype>.Get().Ty;
     }
 }

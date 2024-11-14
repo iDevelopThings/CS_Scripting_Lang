@@ -8,14 +8,14 @@ namespace CSScriptingLang.Parsing.AST;
 public partial class ASTPrintingVisitor : BaseAstVisitor
 {
     public Writer w { get; set; }
-
+    
     public ASTPrintingVisitor() {
         w = new Writer(new CodeWriterSettings(CodeWriterSettings.CSharpDefault) {
             NewLineBeforeBlockBegin = true,
             Indent                  = "    ",
             TranslationMapping = {
-                ["`"] = "\""
-            }
+                ["`"] = "\"",
+            },
         });
     }
 
@@ -116,12 +116,12 @@ public partial class ASTPrintingVisitor : BaseAstVisitor
     public override void VisitArgumentDeclarationNode(ArgumentDeclarationNode node) {
         if (!_visitedNodes.Add(node))
             return;
-        w.WriteInline($"{node.Type} {node.Name}");
+        w.WriteInline($"{node.TypeIdentifier} {node.Name}");
     }
     public override void VisitArgumentListDeclarationNode(ArgumentListDeclarationNode node) {
         if (!_visitedNodes.Add(node))
             return;
-        w.WriteInline($"({string.Join(", ", node.Arguments.Select(x => $"{x.Type} {x.Name}"))})");
+        w.WriteInline($"({string.Join(", ", node.Arguments.Select(x => $"{x.TypeIdentifier} {x.Name}"))})");
     }
     public override void VisitInlineFunctionDeclaration(InlineFunctionDeclaration node) {
         if (!_visitedNodes.Add(node))
@@ -135,10 +135,6 @@ public partial class ASTPrintingVisitor : BaseAstVisitor
 
     }
 
-    public override void VisitBaseNode(BaseNode node) {
-        w._($"BaseNode");
-        base.VisitBaseNode(node);
-    }
     public override void VisitNodeList<T>(NodeList<T> node) {
         w._($"NodeList");
         base.VisitNodeList(node);
